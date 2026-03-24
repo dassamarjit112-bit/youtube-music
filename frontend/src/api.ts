@@ -1,4 +1,4 @@
-const BASE = "/api";
+const BASE = import.meta.env.PROD || window.location.hostname !== 'localhost' ? "/api" : "http://localhost:5000/api";
 
 export interface Song {
   type: "song" | "video";
@@ -69,7 +69,9 @@ export interface PlaylistDetail {
 }
 
 async function get<T>(path: string, params: Record<string, string> = {}): Promise<T> {
-  const url = new URL(BASE + path);
+  const url = BASE.startsWith("http")
+    ? new URL(BASE + path)
+    : new URL(BASE + path, window.location.origin);
   Object.entries(params).forEach(([k, v]) => v && url.searchParams.set(k, v));
   const res = await fetch(url.toString());
   if (!res.ok) throw new Error(`API error: ${res.status}`);
