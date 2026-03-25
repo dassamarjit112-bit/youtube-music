@@ -50,16 +50,43 @@ function App() {
   const [downloads, setDownloads] = useState<Song[]>([]);
   const [activeChip, setActiveChip] = useState<string | null>(null);
   const [isSearchActive, setIsSearchActive] = useState(false);
+  const [playlists, setPlaylists] = useState<{ name: string; tracks: Song[] }[]>([]);
+  const [activeMenuSong, setActiveMenuSong] = useState<Song | null>(null);
+  const [showPlaylistDialog, setShowPlaylistDialog] = useState(false);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
+  useEffect(() => {
+    const hOnline = () => setIsOffline(false);
+    const hOffline = () => setIsOffline(true);
+    window.addEventListener('online', hOnline);
+    window.addEventListener('offline', hOffline);
+    return () => {
+      window.removeEventListener('online', hOnline);
+      window.removeEventListener('offline', hOffline);
+    };
+  }, []);
+  // Persistence Layer
+  useEffect(() => {
+    const savedFavs = localStorage.getItem("ytm_favorites");
+    const savedDLs = localStorage.getItem("ytm_downloads");
+    const savedPlaylists = localStorage.getItem("ytm_playlists");
+    if (savedFavs) setFavorites(JSON.parse(savedFavs));
+    if (savedDLs) setDownloads(JSON.parse(savedDLs));
+    if (savedPlaylists) setPlaylists(JSON.parse(savedPlaylists));
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("ytm_favorites", JSON.stringify(favorites));
+    localStorage.setItem("ytm_downloads", JSON.stringify(downloads));
+    localStorage.setItem("ytm_playlists", JSON.stringify(playlists));
+  }, [favorites, downloads, playlists]);
+
   const silentRef = useRef<HTMLAudioElement | null>(null);
 
   // Android Background Play Persistence
   useEffect(() => {
     if (isPlaying) {
-      if (!silentRef.current) {
-        silentRef.current = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFav7//v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+'); 
-        silentRef.current.loop = true;
-      }
-      silentRef.current.play().catch(e => console.warn("Silent audio blocked", e));
+      silentRef.current?.play().catch(() => {});
     } else {
       silentRef.current?.pause();
     }
@@ -229,6 +256,20 @@ function App() {
     if (data) setPlaybackHistory(data as any);
   };
 
+  const createPlaylist = (name: string) => {
+    if (!name.trim()) return;
+    const newPlaylist = { name, tracks: activeMenuSong ? [activeMenuSong] : [] };
+    setPlaylists(prev => [...prev, newPlaylist]);
+    setActiveMenuSong(null);
+  };
+
+  const addToPlaylist = (song: Song, playlistName: string) => {
+    setPlaylists(prev => prev.map(p => 
+      p.name === playlistName ? { ...p, tracks: [...p.tracks.filter(t => t.videoId !== song.videoId), song] } : p
+    ));
+    setActiveMenuSong(null);
+  };
+
   const logHistory = async (song: Song) => {
     if (!user) return;
     await supabase.from('history').insert({
@@ -280,16 +321,22 @@ function App() {
   const fetchExplore = async () => {
     setIsLoadingExplore(true);
     try {
-      const [moodsRes, newsRes, chartsRes] = await Promise.all([
-        api.moods(), 
-        api.newReleases(),
-        api.charts()
-      ]);
-      setExploreData([
-        { title: "Charts", items: chartsRes.songs || [] },
-        { title: "New Releases", items: newsRes.albums || [] },
-        ...moodsRes.categories
-      ]);
+      const moodsRes = await api.moods().catch(() => ({ categories: [] }));
+      const newsRes = await api.newReleases().catch(() => ({ albums: [] }));
+      const chartsRes = await api.charts().catch(() => ({ songs: [] }));
+      
+      const sections = [];
+      if (chartsRes.songs?.length) sections.push({ title: "Charts", items: chartsRes.songs });
+      if (newsRes.albums?.length) sections.push({ title: "New Releases", items: newsRes.albums });
+      if (moodsRes.categories?.length) sections.push(...moodsRes.categories);
+      
+      // If still empty, use a fallback
+      if (sections.length === 0) {
+        const homeFallback = await api.home();
+        sections.push(...homeFallback.sections.slice(0, 3));
+      }
+
+      setExploreData(sections);
     } catch (err) {
       console.error("Explore fetch failed", err);
     } finally {
@@ -405,11 +452,24 @@ function App() {
     console.log("▶ Playing:", song.title, "| videoId:", song.videoId);
     
     // Set immediate song to start playback
+    if (isOffline && !downloads.some(d => d.videoId === song.videoId)) {
+      setPlayerError("You are offline. Only downloaded songs can be played.");
+      setTimeout(() => setPlayerError(null), 3000);
+      return;
+    }
+
     setCurrentSong(song);
     setPlayed(0);
     setPlayedSeconds(0);
     setDuration(0);
     logHistory(song);
+
+    // Initialize/Restart Silent Audio on User Interaction (CRITICAL FOR BACKGROUND PLAY)
+    if (!silentRef.current) {
+      silentRef.current = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFav7//v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+');
+      silentRef.current.loop = true;
+    }
+    silentRef.current.play().catch(() => {});
     
     // NEW: YouTube Music 'Radio' Logic (30+ tracks)
     // If a list was provided (e.g. from an album), use it.
@@ -544,6 +604,7 @@ function App() {
       <main className="main-content">
         <header className="main-header">
           <div className="header-left">
+            {isOffline && <div className="offline-pill"><PlusCircle size={14} /> Offline Mode</div>}
             <button className="mobile-hide menu-btn" onClick={() => setIsSidebarOpen(true)}>
               <Menu size={24} />
             </button>
@@ -725,7 +786,7 @@ function App() {
                     <section>
                       <div className="section-header">
                         <h2>Downloads</h2>
-                        <span className="badge">Beta</span>
+                        <span className="badge">Offline Available</span>
                       </div>
                       {downloads.length === 0 ? (
                         <p className="no-data">Songs you save for offline will appear here.</p>
@@ -740,11 +801,45 @@ function App() {
                                 <p>{song.artist}</p>
                               </div>
                               <button 
-                                className="dl-btn active"
-                                onClick={(e) => { e.stopPropagation(); toggleDownload(song); }}
+                                className="more-btn-row" 
+                                onClick={(e) => { e.stopPropagation(); setActiveMenuSong(song); }}
                               >
-                                <PlusCircle size={18} />
+                                <MoreVertical size={18} />
                               </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </section>
+
+                    <section>
+                      <div className="section-header">
+                        <h2>Playlists</h2>
+                        <button className="new-chip" onClick={() => setShowPlaylistDialog(true)}>+ New</button>
+                      </div>
+                      {playlists.length === 0 ? (
+                        <p className="no-data">Create your first playlist to get started.</p>
+                      ) : (
+                        <div className="track-list">
+                          {playlists.map((p, i) => (
+                            <div key={i} className="track-row" onClick={() => {
+                              // We reuse albumData for simplicity but set view to playlist + local ID
+                              setAlbumData({
+                                title: p.name,
+                                artist: "Your Playlist",
+                                thumbnail: p.tracks[0]?.thumbnail || "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=200&h=200&fit=crop",
+                                year: "",
+                                trackCount: p.tracks.length,
+                                duration: "",
+                                tracks: p.tracks
+                              });
+                              setView({ name: 'playlist', id: 'local_' + i } as any);
+                            }}>
+                              <div className="playlist-icon-sm"><Music2 size={20} /></div>
+                              <div className="track-info-col">
+                                <h3>{p.name}</h3>
+                                <p>{p.tracks.length} tracks</p>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -766,16 +861,10 @@ function App() {
                               </div>
                               <div className="track-actions-row">
                                 <button 
-                                  className={`dl-btn ${downloads.some(d => d.videoId === song.videoId) ? 'active' : ''}`}
-                                  onClick={(e) => { e.stopPropagation(); toggleDownload(song); }}
+                                  className="more-btn-row" 
+                                  onClick={(e) => { e.stopPropagation(); setActiveMenuSong(song); }}
                                 >
-                                  <PlusCircle size={16} />
-                                </button>
-                                <button 
-                                  className="fav-btn active"
-                                  onClick={(e) => { e.stopPropagation(); toggleFavorite(song); }}
-                                >
-                                  <ThumbsUp size={16} fill="currentColor" />
+                                  <MoreVertical size={18} />
                                 </button>
                               </div>
                             </div>
@@ -845,12 +934,92 @@ function App() {
                                 <PlusCircle size={18} />
                               </button>
                             )}
-                            <MoreVertical size={18} />
+                            <button 
+                              className="more-btn-row" 
+                              onClick={(e) => { e.stopPropagation(); setActiveMenuSong(item as Song); }}
+                            >
+                              <MoreVertical size={18} />
+                            </button>
                           </div>
                         </div>
                       ))}
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* ── CONTEXT MENU OVERLAY ── */}
+              <AnimatePresence>
+                {activeMenuSong && (
+                  <div className="menu-overlay" onClick={() => setActiveMenuSong(null)}>
+                    <motion.div 
+                      className="menu-content"
+                      initial={{ y: "100%" }}
+                      animate={{ y: 0 }}
+                      exit={{ y: "100%" }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="menu-header">
+                        <img src={activeMenuSong.thumbnail} alt="" />
+                        <div className="txt">
+                          <h3>{activeMenuSong.title}</h3>
+                          <p>{activeMenuSong.artist}</p>
+                        </div>
+                      </div>
+                      <div className="menu-list">
+                        <button onClick={() => { playSong(activeMenuSong); setActiveMenuSong(null); }}>
+                          <Play size={20} /> Play
+                        </button>
+                        <button onClick={() => { toggleFavorite(activeMenuSong); setActiveMenuSong(null); }}>
+                          <ThumbsUp size={20} fill={favorites.some(f => f.videoId === activeMenuSong.videoId) ? "currentColor" : "none"} /> 
+                          {favorites.some(f => f.videoId === activeMenuSong.videoId) ? 'Remove from Liked' : 'Like'}
+                        </button>
+                        <button onClick={() => { toggleDownload(activeMenuSong); setActiveMenuSong(null); }}>
+                          <PlusCircle size={20} /> {downloads.some(d => d.videoId === activeMenuSong.videoId) ? 'Remove Download' : 'Download'}
+                        </button>
+                        <div className="submenu-section">
+                          <p>Add to Playlist</p>
+                          {playlists.map((p, i) => (
+                            <button key={i} onClick={() => addToPlaylist(activeMenuSong, p.name)}>
+                              <Music2 size={18} /> {p.name}
+                            </button>
+                          ))}
+                          <button className="new-p-btn" onClick={() => { setShowPlaylistDialog(true); }}>
+                            + New Playlist
+                          </button>
+                        </div>
+                      </div>
+                      <button className="menu-close" onClick={() => setActiveMenuSong(null)}>Close</button>
+                    </motion.div>
+                  </div>
+                )}
+              </AnimatePresence>
+
+              {/* ── NEW PLAYLIST DIALOG ── */}
+              {showPlaylistDialog && (
+                <div className="dialog-overlay">
+                  <div className="dialog-card">
+                    <h3>New Playlist</h3>
+                    <input 
+                      type="text" 
+                      placeholder="Playlist name" 
+                      autoFocus 
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          createPlaylist((e.target as HTMLInputElement).value);
+                          setShowPlaylistDialog(false);
+                        }
+                      }}
+                    />
+                    <div className="dialog-btns">
+                      <button onClick={() => setShowPlaylistDialog(false)}>Cancel</button>
+                      <button onClick={() => {
+                        const input = document.querySelector('.dialog-card input') as HTMLInputElement;
+                        createPlaylist(input.value);
+                        setShowPlaylistDialog(false);
+                      }}>Create</button>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -1026,12 +1195,11 @@ function App() {
                         </div>
                         <div className="track-actions-row">
                           <button 
-                            className={`dl-btn ${downloads.some(d => d.videoId === track.videoId) ? 'active' : ''}`}
-                            onClick={(e) => { e.stopPropagation(); toggleDownload(track); }}
+                            className="more-btn-row" 
+                            onClick={(e) => { e.stopPropagation(); setActiveMenuSong(track); }}
                           >
-                            <PlusCircle size={16} />
+                            <MoreVertical size={18} />
                           </button>
-                          <span className="track-dur">{track.duration}</span>
                         </div>
                       </div>
                     ))}
