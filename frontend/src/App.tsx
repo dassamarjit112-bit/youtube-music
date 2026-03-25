@@ -70,16 +70,30 @@ function App() {
     const savedFavs = localStorage.getItem("ytm_favorites");
     const savedDLs = localStorage.getItem("ytm_downloads");
     const savedPlaylists = localStorage.getItem("ytm_playlists");
+    const savedSong = localStorage.getItem("ytm_currentSong");
+    const savedView = localStorage.getItem("ytm_view");
+    
     if (savedFavs) setFavorites(JSON.parse(savedFavs));
     if (savedDLs) setDownloads(JSON.parse(savedDLs));
     if (savedPlaylists) setPlaylists(JSON.parse(savedPlaylists));
+    if (savedSong) {
+      const song = JSON.parse(savedSong);
+      setCurrentSong(song);
+      // Auto-resume queue if possible
+      const savedQueue = localStorage.getItem("ytm_queue");
+      if (savedQueue) setQueue(JSON.parse(savedQueue));
+    }
+    if (savedView) setView(JSON.parse(savedView));
   }, []);
 
   useEffect(() => {
     localStorage.setItem("ytm_favorites", JSON.stringify(favorites));
     localStorage.setItem("ytm_downloads", JSON.stringify(downloads));
     localStorage.setItem("ytm_playlists", JSON.stringify(playlists));
-  }, [favorites, downloads, playlists]);
+    if (currentSong) localStorage.setItem("ytm_currentSong", JSON.stringify(currentSong));
+    localStorage.setItem("ytm_queue", JSON.stringify(queue));
+    localStorage.setItem("ytm_view", JSON.stringify(view));
+  }, [favorites, downloads, playlists, currentSong, queue, view]);
 
   const silentRef = useRef<HTMLAudioElement | null>(null);
 
@@ -650,6 +664,12 @@ function App() {
                 <Search size={24} />
               </button>
             )}
+            <button 
+          className="mobile-only search-trigger" 
+          onClick={(e) => { e.stopPropagation(); setActiveMenuSong(currentSong); }}
+        >
+          <MoreVertical size={24} />
+        </button>
             <button className="cast-btn" onClick={() => setView({ name: 'account' })} title="Account"><Tv size={20} /></button>
             <div className="avatar" onClick={() => setView({ name: 'account' })}>{user?.email?.[0].toUpperCase()}</div>
           </div>
@@ -705,7 +725,12 @@ function App() {
                             }}
                           >
                             <div className="card-thumb">
-                              <img src={item.thumbnail} alt="" loading="lazy" />
+                              <img 
+                                src={item.thumbnail} 
+                                alt="" 
+                                loading="lazy" 
+                                onError={(e) => { (e.target as any).src = 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&h=500&fit=crop'; }} 
+                              />
                               {(item.type === "song" || item.type === "video") && (
                                 <div className="play-overlay">
                                   <Play size={24} fill="#fff" />
@@ -764,7 +789,11 @@ function App() {
                             }}
                           >
                             <div className="card-thumb">
-                              <img src={item.thumbnail} alt="" />
+                              <img 
+                                src={item.thumbnail} 
+                                alt="" 
+                                onError={(e) => { (e.target as any).src = 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=200&h=200&fit=crop'; }} 
+                              />
                               {s.title === 'Charts' && <div className="rank">#{j+1}</div>}
                             </div>
                             <div className="card-info">
@@ -812,10 +841,15 @@ function App() {
                       )}
                     </section>
 
+                    <section className="playlist-creation-section">
+                      <button className="big-create-btn" onClick={() => setShowPlaylistDialog(true)}>
+                        <PlusCircle size={24} /> Create New Playlist
+                      </button>
+                    </section>
+                    
                     <section>
                       <div className="section-header">
                         <h2>Playlists</h2>
-                        <button className="new-chip" onClick={() => setShowPlaylistDialog(true)}>+ New</button>
                       </div>
                       {playlists.length === 0 ? (
                         <p className="no-data">Create your first playlist to get started.</p>
@@ -873,8 +907,10 @@ function App() {
                       )}
                     </section>
 
-                    <section>
-                      <h2>Recent History</h2>
+                    <section className="library-history-section">
+                      <div className="section-header">
+                        <h2>Recent History</h2>
+                      </div>
                       {playbackHistory.length === 0 ? (
                         <p className="no-data">No history yet.</p>
                       ) : (
@@ -882,7 +918,11 @@ function App() {
                           {playbackHistory.slice(0, 10).map((song, i) => (
                             <div key={i} className="track-row" onClick={() => playSong(song)}>
                               <span className="track-num">{i + 1}</span>
-                              <img src={song.thumbnail} alt="" />
+                              <img 
+                                src={song.thumbnail} 
+                                alt="" 
+                                onError={(e) => { (e.target as any).src = 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=200&h=200&fit=crop'; }} 
+                              />
                               <div className="track-info-col">
                                 <h3>{song.title}</h3>
                                 <p>{song.artist}</p>
@@ -919,7 +959,12 @@ function App() {
                               }
                           }}
                         >
-                          <img src={item.thumbnail} alt="" className="row-thumb" />
+                        <img 
+                          src={item.thumbnail} 
+                          alt="" 
+                          className="row-thumb" 
+                          onError={(e) => { (e.target as any).src = 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=200&h=200&fit=crop'; }} 
+                        />
                           <div className="row-info">
                             <h3>{item.title || item.name}</h3>
                             <p className="row-type-badge">{item.type}</p>
@@ -1228,7 +1273,12 @@ function App() {
           <div className="track-info">
             {currentSong ? (
               <>
-                <img src={currentSong.thumbnail} alt="" className="thumb" />
+                <img 
+                  src={currentSong.thumbnail} 
+                  alt="" 
+                  className="thumb" 
+                  onError={(e) => { (e.target as any).src = 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=100&h=100&fit=crop'; }} 
+                />
                 <div className="text">
                   <h3>{currentSong.title}</h3>
                   <p>{currentSong.artist} • {currentSong.duration}</p>
@@ -1303,6 +1353,7 @@ function App() {
             onToggleFavorite={toggleFavorite}
             downloads={downloads}
             toggleDownload={toggleDownload}
+            onShowMenu={setActiveMenuSong}
           />
         )}
       </AnimatePresence>
@@ -1343,7 +1394,8 @@ const FullScreenPlayer = ({
   favorites,
   onToggleFavorite,
   downloads,
-  toggleDownload
+  toggleDownload,
+  onShowMenu
 }: any) => {
   return (
     <motion.div 
@@ -1356,7 +1408,7 @@ const FullScreenPlayer = ({
       <header className="mobile-player-header">
         <button className="close-btn" onClick={onClose}><SkipBack size={24} style={{ transform: 'rotate(-90deg)' }} /></button>
         <div className="title">Now Playing</div>
-        <button className="more-btn"><MoreVertical size={24} /></button>
+        <button className="more-btn" onClick={() => onShowMenu(song)}><MoreVertical size={24} /></button>
       </header>
 
       <div className="player-content-scroll">
@@ -1366,6 +1418,7 @@ const FullScreenPlayer = ({
             src={song.thumbnail} 
             alt="" 
             className="big-thumb" 
+            onError={(e) => { (e.target as any).src = 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&h=800&fit=crop'; }} 
           />
           <div className="meta">
             <div className="text">
@@ -1425,7 +1478,11 @@ const FullScreenPlayer = ({
                 onClick={() => onPlaySong(s)}
               >
                 <div className="img-wrap">
-                  <img src={s.thumbnail} alt="" />
+                  <img 
+                    src={s.thumbnail} 
+                    alt="" 
+                    onError={(e) => { (e.target as any).src = 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=100&h=100&fit=crop'; }} 
+                  />
                   {song.videoId === s.videoId && <div className="playing-overlay"><Music2 size={16} /></div>}
                 </div>
                 <div className="txt">
