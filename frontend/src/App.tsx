@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import {
   Play, Pause, SkipBack, SkipForward, Shuffle, Repeat,
-  Volume2, ThumbsUp, ThumbsDown, MoreVertical, Search,
+  Volume2, ThumbsUp, MoreVertical, Search,
   Home, Compass, Library, PlusCircle, Tv, ArrowLeft, Music2, Menu
 } from "lucide-react";
 import { api } from "./api";
@@ -46,7 +46,7 @@ function App() {
   const [showMobilePlayer, setShowMobilePlayer] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [favorites, setFavorites] = useState<Song[]>([]); // list of full song objects
-  const [history, setHistory] = useState<Song[]>([]);
+  const [playbackHistory, setPlaybackHistory] = useState<Song[]>([]);
   const [downloads, setDownloads] = useState<Song[]>([]);
   const [activeChip, setActiveChip] = useState<string | null>(null);
   const [isSearchActive, setIsSearchActive] = useState(false);
@@ -65,16 +65,6 @@ function App() {
     }
   }, [isPlaying]);
 
-  useEffect(() => {
-    const handleVisible = () => {
-      // If we come back and it should be playing but yt-player is paused, resume it.
-      if (document.visibilityState === 'visible' && isPlaying) {
-        ytPlayer.play();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisible);
-    return () => document.removeEventListener('visibilitychange', handleVisible);
-  }, [isPlaying, ytPlayer]);
 
   const currentSongRef = useRef(currentSong);
   currentSongRef.current = currentSong;
@@ -110,6 +100,17 @@ function App() {
       }, 2500);
     },
   });
+
+  useEffect(() => {
+    const handleVisible = () => {
+      // If we come back and it should be playing but yt-player is paused, resume it.
+      if (document.visibilityState === 'visible' && isPlaying) {
+        ytPlayer.play();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisible);
+    return () => document.removeEventListener('visibilitychange', handleVisible);
+  }, [isPlaying, ytPlayer]);
 
   // Volume sync
   useEffect(() => {
@@ -225,7 +226,7 @@ function App() {
 
   const fetchHistory = async (userId: string) => {
     const { data } = await supabase.from('history').select('*').eq('user_id', userId).order('played_at', { ascending: false }).limit(30);
-    if (data) setHistory(data as any);
+    if (data) setPlaybackHistory(data as any);
   };
 
   const logHistory = async (song: Song) => {
@@ -776,6 +777,26 @@ function App() {
                                 >
                                   <ThumbsUp size={16} fill="currentColor" />
                                 </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </section>
+
+                    <section>
+                      <h2>Recent History</h2>
+                      {playbackHistory.length === 0 ? (
+                        <p className="no-data">No history yet.</p>
+                      ) : (
+                        <div className="track-list">
+                          {playbackHistory.slice(0, 10).map((song, i) => (
+                            <div key={i} className="track-row" onClick={() => playSong(song)}>
+                              <span className="track-num">{i + 1}</span>
+                              <img src={song.thumbnail} alt="" />
+                              <div className="track-info-col">
+                                <h3>{song.title}</h3>
+                                <p>{song.artist}</p>
                               </div>
                             </div>
                           ))}
