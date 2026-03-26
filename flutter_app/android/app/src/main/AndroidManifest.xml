@@ -11,6 +11,9 @@
         android:label="YTM Clone"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
         
         <service
             android:name="androidx.media.session.MediaButtonReceiver"

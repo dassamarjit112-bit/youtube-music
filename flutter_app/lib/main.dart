@@ -22,10 +22,7 @@ class _YTMAppState extends State<YTMApp> {
       backgroundColor: Colors.black,
       body: SafeArea(
         child: InAppWebView(
-          initialUrlRequest: URLRequest(
-            // Replace with your local IP or hosted URL for testing
-            url: WebUri("http://localhost:5173"), 
-          ),
+          initialUrlRequest: URLRequest(url: WebUri("https://google.com")),
           initialSettings: InAppWebViewSettings(
             mediaPlaybackRequiresUserGesture: false,
             allowsInlineMediaPlayback: true,
