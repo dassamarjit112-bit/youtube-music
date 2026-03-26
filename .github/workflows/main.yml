@@ -32,3 +32,9 @@ jobs:
           # FIX: The -P flag overrides the broken local Java path
           flutter build apk --release --no-tree-shake-icons -v
           
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: my-new-app
+          path: flutter_app/build/app/outputs/flutter-apk/app-release.apk
+          
