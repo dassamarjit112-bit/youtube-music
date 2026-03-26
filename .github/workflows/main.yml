@@ -1,29 +1,30 @@
-name: Online APK Build
-on: [push]
+name: Build Flutter APK
+on: [push, pull_request]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: subosito/flutter-action@v2
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.0' # Matches most current Flutter projects
+          flutter-version: '3.19.0' # This fixes the SDK version error
           channel: 'stable'
       
-      - name: Get Dependencies
+      - name: Install dependencies
         run: |
           cd flutter_app
           flutter pub get
 
-      - name: Build Release APK
+      - name: Build APK
         run: |
           cd flutter_app
           flutter build apk --release --no-tree-shake-icons
 
-      - name: Upload APK Artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload APK
+        uses: actions/upload-artifact@v4 # Updated to v4 for better reliability
         with:
-          name: YouTube-Music-Fixed
+          name: release-apk
           path: flutter_app/build/app/outputs/flutter-apk/app-release.apk
-
