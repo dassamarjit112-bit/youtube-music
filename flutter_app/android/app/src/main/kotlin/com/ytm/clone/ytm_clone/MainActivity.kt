@@ -1,4 +1,4 @@
-package com.example.flutter_app
+package com.ytm.clone.ytm_clone
 
 import io.flutter.embedding.android.FlutterActivity
 
