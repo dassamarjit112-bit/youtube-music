@@ -1,5 +1,6 @@
+// ADD THIS LINE: It defines debugPrint
+import 'package:flutter/material.dart'; 
 import 'package:google_sign_in/google_sign_in.dart';
-// Remove any line that says: import 'package:package:ytm_clone/services/google_auth_service.dart';
 
 class GoogleAuthService {
   // Use the CLIENT ID from the "Web Application" type in Google Console
@@ -15,8 +16,8 @@ class GoogleAuthService {
         final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
         final String? idToken = googleAuth.idToken;
 
+        // Now this will work!
         debugPrint("Token obtained: $idToken");
-        // Add your logic to send to backend here
       }
     } catch (error) {
       debugPrint("Login Failed: $error");
