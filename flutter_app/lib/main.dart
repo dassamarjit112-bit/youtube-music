@@ -103,21 +103,6 @@ class _YTMAppState extends State<YTMApp> {
                 }
               },
             ),
-            
-            Positioned(
-              bottom: 20,
-              right: 20,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.redAccent,
-                  foregroundColor: Colors.white,
-                ),
-                onPressed: () async {
-                  await _authService.handleSignIn();
-                },
-                child: const Text("Sign in with Google"),
-              ),
-            ),
           ],
         ),
       ),

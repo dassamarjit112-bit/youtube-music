@@ -16,12 +16,12 @@ export function Auth({ onLogin }: AuthProps) {
 
   useEffect(() => {
     // Strictly detect if running inside a Flutter WebView or Android WebView
-    // Do NOT trigger just because it's a mobile device (e.g. Chrome on Android)
     const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
     const isWebView = 
       /wv/i.test(userAgent) || 
       /flutter/i.test(userAgent) || 
-      (window as any).flutter_inappwebview !== undefined;
+      (window as any).flutter_inappwebview !== undefined ||
+      window.location.port === '8080'; // The Flutter App's Dart server runs on port 8080
     
     setIsFlutterApp(isWebView);
   }, []);
