@@ -36,9 +36,13 @@ jobs:
       - name: Build APK
         run: |
           cd flutter_app
-          # 4. Use --no-pub to prevent the tool from re-triggering the crash
-          flutter build apk --release --no-tree-shake-icons --no-pub
-
+          # 1. Clear all old build files
+          flutter clean
+          # 2. Re-download all packages correctly
+          flutter pub get
+          # 3. Build while ignoring icon errors and bypassing the URI bug
+          flutter build apk --release --no-tree-shake-icons
+          
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
