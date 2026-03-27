@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 class GoogleAuthService {
   // Use the CLIENT ID from the "Web Application" type in Google Console
   final GoogleSignIn _googleSignIn = GoogleSignIn(
-    serverClientId: 'YOUR_WEB_CLIENT_ID.apps.googleusercontent.com',
+    serverClientId: '79361906244-al0q0s3lc37fqn1el1488gjd0u02mrrj.apps.googleusercontent.com',
   );
 
   Future<void> handleSignIn() async {
