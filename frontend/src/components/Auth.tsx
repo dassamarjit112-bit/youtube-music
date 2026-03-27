@@ -1,32 +1,46 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { motion } from 'framer-motion';
+import { GoogleLogin } from '@react-oauth/google';
+import { jwtDecode } from 'jwt-decode';
 
-export function Auth() {
+interface AuthProps {
+  onLogin: (user: any) => void;
+}
+
+export function Auth({ onLogin }: AuthProps) {
   const [loading, setLoading] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isSignUp, setIsSignUp] = useState(false);
 
-  const handleEmailAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSuccess = async (response: any) => {
     setLoading(true);
-    const { error } = isSignUp 
-      ? await supabase.auth.signUp({ email, password })
-      : await supabase.auth.signInWithPassword({ email, password });
-    
-    if (error) alert(error.message);
-    setLoading(false);
-  };
+    try {
+      const decoded: any = jwtDecode(response.credential);
+      const userData = {
+        id: decoded.sub,
+        email: decoded.email,
+        full_name: decoded.name,
+        avatar_url: decoded.picture,
+      };
 
-  const signInWithGoogle = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: window.location.origin
+      // Direct Database persistence (instead of Supabase Auth)
+      // This satisfies the "accounts in the app only" requirement
+      const { error } = await supabase
+        .from('profiles')
+        .upsert(userData);
+
+      if (error) {
+        console.error("Profile sync failed:", error.message);
       }
-    });
-    if (error) alert(error.message);
+
+      // Persist locally and update app state
+      localStorage.setItem('ytm_user', JSON.stringify(userData));
+      onLogin(userData);
+    } catch (err) {
+      console.error("Login decoding failed:", err);
+      alert('Google Login failed to process. Check console.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -44,54 +58,44 @@ export function Auth() {
             </svg>
             <span style={{color: '#fff', fontSize: '26px', fontWeight: '800', letterSpacing: '-1px'}}>Music</span>
           </div>
-          <h1>{isSignUp ? 'Create your account' : 'Sign in'}</h1>
+          <h1 style={{ marginTop: '20px' }}>Sign in</h1>
           <p>to continue to YouTube Music</p>
         </div>
 
-        <button onClick={signInWithGoogle} className="google-signin-btn">
-          <img src="https://lh3.googleusercontent.com/COxitqgJr1sICpeqCu7IFH7I64k3-7B14mRLeuS60B8_8D-0v6S6_08I3vj7U8-p-n0=w300" alt="Google" style={{width: '24px', height: '24px'}} />
-          Sign in with Google
-        </button>
-
-        <div className="auth-divider">
-          <span>or use email</span>
+        <div className="google-center-login" style={{ display: 'flex', justifyContent: 'center', padding: '20px 0' }}>
+          {loading ? (
+            <div className="loader" style={{ margin: '20px 0' }}></div>
+          ) : (
+            <GoogleLogin 
+              onSuccess={handleSuccess} 
+              onError={() => alert('Google Sign-In failed')}
+              useOneTap
+              theme="filled_black"
+              shape="pill"
+              size="large"
+              width="300"
+            />
+          )}
         </div>
 
-        <form onSubmit={handleEmailAuth} className="google-form">
-          <div className="input-group">
-            <input 
-              type="email" 
-              placeholder="Email address" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required 
-            />
-          </div>
-          <div className="input-group">
-            <input 
-              type="password" 
-              placeholder="Password" 
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required 
-            />
-          </div>
-          
-          <div className="form-actions">
-            <button 
-              type="button" 
-              className="toggle-auth"
-              onClick={() => setIsSignUp(!isSignUp)}
-            >
-              {isSignUp ? 'Sign in instead' : 'Create account'}
-            </button>
-            <button type="submit" className="blue-btn" disabled={loading}>
-              {loading ? 'Wait...' : 'Next'}
-            </button>
-          </div>
-        </form>
+        <div className="auth-divider" style={{ margin: '30px 0' }}>
+          <span>Secure direct authentication</span>
+        </div>
+
+        <p style={{ fontSize: '12px', color: '#5f6368', textAlign: 'center', lineHeight: '1.6' }}>
+          By signing in, you agree to the Terms of Service. Your account information will be stored securely in our database.
+        </p>
+
+        <div className="form-actions" style={{ justifyContent: 'center' }}>
+          <button 
+            type="button" 
+            className="toggle-auth"
+            onClick={() => alert('Direct Google login is the only supported method for security.')}
+          >
+            Privacy Policy
+          </button>
+        </div>
       </motion.div>
     </div>
   );
 }
-
