@@ -26,9 +26,10 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  # Ensure your assets are indented exactly like this (2 spaces)
-  # assets:
-  #   - assets/images/
-
+  assets:
+    - assets/www/
+    # If Vite has a subfolder for assets, add it too:
+    - assets/www/assets/ 
+    
 
   
