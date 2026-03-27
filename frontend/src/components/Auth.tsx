@@ -92,7 +92,7 @@ export function Auth({ onLogin }: AuthProps) {
             <svg viewBox="0 0 24 24" width="40" height="40">
               <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z" fill="#f00" />
             </svg>
-            <span style={{ color: '#fff', fontSize: '28px', fontWeight: '800', letterSpacing: '-1px' }}>Music</span>
+            <span style={{ color: '#000000', fontSize: '28px', fontWeight: '800', letterSpacing: '-1px' }}>Music</span>
           </div>
           <h1 style={{ marginTop: '20px' }}>Sign in</h1>
           <p>to continue to YouTube Music</p>
