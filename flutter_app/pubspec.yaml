@@ -10,6 +10,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # Update this line specifically
+  flutter_inappwebview: ^6.1.0+1 
+  # ... your other dependencies (google_sign_in, etc.)
+  
   cupertino_icons: ^1.0.8
   google_sign_in: ^6.2.1
   http: ^1.1.0
