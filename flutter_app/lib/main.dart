@@ -2,8 +2,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
-import 'package:ytm_clone/services/google_auth_service.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'dart:convert';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -12,7 +13,6 @@ void main() async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 8080);
     server.listen((HttpRequest request) async {
       try {
-        // ROBUST PATH HANDLING: Remove leading slash and handle empty/root paths
         String path = request.uri.path;
         if (path == '/') {
           path = 'index.html';
@@ -20,13 +20,11 @@ void main() async {
           path = path.substring(1);
         }
         
-        // Clean any double slashes if they occur
         path = path.replaceAll('//', '/');
 
         final byteData = await rootBundle.load('assets/www/$path');
         final bytes = byteData.buffer.asUint8List();
         
-        // ROBUST MIME TYPES: Mandatory for modern web frameworks like Vite
         if (path.endsWith('.html')) {
           request.response.headers.contentType = ContentType.html;
         } else if (path.endsWith('.js') || path.endsWith('.mjs')) {
@@ -45,7 +43,6 @@ void main() async {
         
         request.response.add(bytes);
       } catch (e) {
-        // If file not found or error, return 404
         request.response.statusCode = HttpStatus.notFound;
         debugPrint("Asset load error: $e");
       } finally {
@@ -69,44 +66,33 @@ class YTMApp extends StatefulWidget {
 }
 
 class _YTMAppState extends State<YTMApp> {
-  final GoogleAuthService _authService = GoogleAuthService();
   InAppWebViewController? _webViewController;
-// Inside your State class where the WebView is initialized
-late final WebViewController _controller;
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
 
-@override
-void initState() {
-  super.initState();
-  _controller = WebViewController()
-    ..setJavaScriptMode(JavaScriptMode.unrestricted)
-    // Create the channel named 'FlutterAuth'
-    ..addJavaScriptChannel(
-      'FlutterAuth',
-      onMessageReceived: (JavaScriptMessage message) {
-        if (message.message == 'triggerGoogleLogin') {
-          _handleNativeGoogleSignIn();
-        }
-      },
-    )
-    ..loadRequest(Uri.parse('YOUR_WEB_APP_URL'));
-}
-
-Future<void> _handleNativeGoogleSignIn() async {
-  try {
-    final GoogleSignIn _googleSignIn = GoogleSignIn();
-    final GoogleSignInAccount? account = await _googleSignIn.signIn();
-    
-    if (account != null) {
-      // Send the user data back to React
-      final String userJson = '{"email": "${account.email}", "full_name": "${account.displayName}", "id": "${account.id}", "avatar_url": "${account.photoUrl}"}';
+  // Integrated Native Sign-In Handler
+  Future<void> _handleNativeGoogleSignIn() async {
+    try {
+      final GoogleSignInAccount? account = await _googleSignIn.signIn();
       
-      // Call a function you define in React to handle the result
-      await _controller.runJavaScript('window.onNativeLoginSuccess($userJson)');
+      if (account != null && _webViewController != null) {
+        // Create a structured Map for the data
+        final Map<String, dynamic> userData = {
+          "email": account.email,
+          "full_name": account.displayName,
+          "id": account.id,
+          "avatar_url": account.photoUrl,
+        };
+        
+        // Convert to JSON and send to React
+        final String userJson = jsonEncode(userData);
+        await _webViewController!.evaluateJavascript(
+          source: 'window.onNativeLoginSuccess($userJson)'
+        );
+      }
+    } catch (error) {
+      debugPrint("Google Sign-In Error: $error");
     }
-  } catch (error) {
-    print("Google Sign-In Error: $error");
   }
-}
   
   @override
   Widget build(BuildContext context) {
@@ -124,13 +110,22 @@ Future<void> _handleNativeGoogleSignIn() async {
                 allowsInlineMediaPlayback: true,
                 javaScriptEnabled: true,
                 domStorageEnabled: true,
-                // Allow self-signed or local content
                 mixedContentMode: MixedContentMode.MIXED_CONTENT_ALWAYS_ALLOW,
               ),
               onWebViewCreated: (controller) {
                 _webViewController = controller;
+
+                // Set up the JavaScript Handler for 'FlutterAuth'
+                controller.addJavaScriptHandler(
+                  handlerName: 'FlutterAuth',
+                  callback: (args) {
+                    // This triggers when React calls: window.flutter_inappwebview.callHandler('FlutterAuth', 'triggerGoogleLogin')
+                    if (args.isNotEmpty && args[0] == 'triggerGoogleLogin') {
+                      _handleNativeGoogleSignIn();
+                    }
+                  },
+                );
               },
-              // ROBUST LOADING: If the server is slow to start, retry on failure
               onReceivedError: (controller, request, error) {
                 if (request.url.toString().contains("localhost:8080")) {
                   Future.delayed(const Duration(milliseconds: 500), () {
