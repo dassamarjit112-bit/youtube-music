@@ -214,12 +214,29 @@ function App() {
 
   // App Session Listener
   useEffect(() => {
+    // If already loaded from localStorage, just fetch dependent data
     if (user?.id) {
-      console.log("👤 Session Active:", user.full_name);
       fetchFavorites(user.id);
       fetchHistory(user.id);
+      return;
     }
-  }, [user?.id]);
+    // Fallback: check Supabase session (e.g. after OAuth redirect or page refresh)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        const u = {
+          id: session.user.id,
+          email: session.user.email ?? '',
+          full_name: session.user.user_metadata?.full_name ?? session.user.email?.split('@')[0] ?? '',
+          avatar_url: session.user.user_metadata?.avatar_url ?? '',
+        };
+        localStorage.setItem('ytm_user', JSON.stringify(u));
+        setUser(u);
+        fetchFavorites(u.id);
+        fetchHistory(u.id);
+      }
+    });
+  }, []);
+
 
   // Sync session loading
   const isLoggedIn = !!user;
