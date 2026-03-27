@@ -36,12 +36,6 @@ jobs:
       - name: Build APK
        run: |
           cd flutter_app
-          # Remove any leftover build artifacts manually
-          rm -rf build/
-          rm -f .dart_tool/package_config.json
-          
-          # Rebuild the dependency map
-          flutter pub get
           
           # Run the build with a fresh start
           flutter build apk --release --no-tree-shake-icons
