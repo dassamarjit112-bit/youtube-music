@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
-// FIX: Removed 'package:' prefix and the accidental space before 'services'
 import 'package:ytm_clone/services/google_auth_service.dart';
 
 void main() async {
@@ -13,24 +12,48 @@ void main() async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 8080);
     server.listen((HttpRequest request) async {
       try {
-        String path = request.uri.path == '/' ? 'index.html' : request.uri.path;
-        if (path.startsWith('/')) path = path.substring(1);
+        // ROBUST PATH HANDLING: Remove leading slash and handle empty/root paths
+        String path = request.uri.path;
+        if (path == '/') {
+          path = 'index.html';
+        } else if (path.startsWith('/')) {
+          path = path.substring(1);
+        }
         
+        // Clean any double slashes if they occur
+        path = path.replaceAll('//', '/');
+
         final byteData = await rootBundle.load('assets/www/$path');
         final bytes = byteData.buffer.asUint8List();
         
-        if (path.endsWith('.html')) request.response.headers.contentType = ContentType.html;
-        else if (path.endsWith('.js')) request.response.headers.contentType = ContentType('application', 'javascript', charset: 'utf-8');
-        else if (path.endsWith('.css')) request.response.headers.contentType = ContentType('text', 'css', charset: 'utf-8');
+        // ROBUST MIME TYPES: Mandatory for modern web frameworks like Vite
+        if (path.endsWith('.html')) {
+          request.response.headers.contentType = ContentType.html;
+        } else if (path.endsWith('.js') || path.endsWith('.mjs')) {
+          request.response.headers.contentType = ContentType('application', 'javascript', charset: 'utf-8');
+        } else if (path.endsWith('.css')) {
+          request.response.headers.contentType = ContentType('text', 'css', charset: 'utf-8');
+        } else if (path.endsWith('.svg')) {
+          request.response.headers.contentType = ContentType('image', 'svg+xml');
+        } else if (path.endsWith('.png')) {
+          request.response.headers.contentType = ContentType('image', 'png');
+        } else if (path.endsWith('.jpg') || path.endsWith('.jpeg')) {
+          request.response.headers.contentType = ContentType('image', 'jpeg');
+        } else if (path.endsWith('.json')) {
+          request.response.headers.contentType = ContentType.json;
+        }
         
         request.response.add(bytes);
       } catch (e) {
+        // If file not found or error, return 404
         request.response.statusCode = HttpStatus.notFound;
+        debugPrint("Asset load error: $e");
+      } finally {
+        await request.response.close();
       }
-      await request.response.close();
     });
   } catch (e) {
-    debugPrint("Server Error: $e");
+    debugPrint("Critical Server Error: $e");
   }
 
   runApp(const MaterialApp(
@@ -47,6 +70,7 @@ class YTMApp extends StatefulWidget {
 
 class _YTMAppState extends State<YTMApp> {
   final GoogleAuthService _authService = GoogleAuthService();
+  InAppWebViewController? _webViewController;
 
   @override
   Widget build(BuildContext context) {
@@ -55,7 +79,6 @@ class _YTMAppState extends State<YTMApp> {
       body: SafeArea(
         child: Stack(
           children: [
-            // Your WebView Layer
             InAppWebView(
               initialUrlRequest: URLRequest(
                 url: WebUri("http://localhost:8080/index.html"), 
@@ -65,14 +88,30 @@ class _YTMAppState extends State<YTMApp> {
                 allowsInlineMediaPlayback: true,
                 javaScriptEnabled: true,
                 domStorageEnabled: true,
+                // Allow self-signed or local content
+                mixedContentMode: MixedContentMode.MIXED_CONTENT_ALWAYS_ALLOW,
               ),
+              onWebViewCreated: (controller) {
+                _webViewController = controller;
+              },
+              // ROBUST LOADING: If the server is slow to start, retry on failure
+              onReceivedError: (controller, request, error) {
+                if (request.url.toString().contains("localhost:8080")) {
+                  Future.delayed(const Duration(milliseconds: 500), () {
+                    controller.reload();
+                  });
+                }
+              },
             ),
             
-            // Floating Auth Button so it doesn't block the WebView
             Positioned(
               bottom: 20,
               right: 20,
               child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.redAccent,
+                  foregroundColor: Colors.white,
+                ),
                 onPressed: () async {
                   await _authService.handleSignIn();
                 },
