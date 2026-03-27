@@ -36,12 +36,8 @@ jobs:
       - name: Build APK
         run: |
           cd flutter_app
-          # 1. Clear all old build files
-          flutter clean
-          # 2. Re-download all packages correctly
-          flutter pub get
           # 3. Build while ignoring icon errors and bypassing the URI bug
-          flutter build apk --release --no-tree-shake-icons
+          flutter build apk --release --no-tree-shake--no-pub
           
       - name: Upload APK
         uses: actions/upload-artifact@v4
