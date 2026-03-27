@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { motion } from 'framer-motion';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
@@ -19,7 +19,7 @@ export function Auth({ onLogin }: AuthProps) {
     const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
     const isMobileDevice = /android|iphone|ipad|ipod/i.test(userAgent);
     const isWebView = /wv|flutter/i.test(userAgent) || (window as any).flutter_inappwebview !== undefined;
-    
+
     // Set to true if it is a mobile device and/or webview.
     setIsFlutterApp(isMobileDevice || isWebView);
   }, []);
@@ -33,7 +33,7 @@ export function Auth({ onLogin }: AuthProps) {
         redirectTo: window.location.origin
       }
     });
-    
+
     if (error) {
       alert(error.message);
       setLoading(false);
@@ -60,7 +60,7 @@ export function Auth({ onLogin }: AuthProps) {
       // Update state to trigger smooth redirect to home
       localStorage.setItem('ytm_user', JSON.stringify(userData));
       onLogin(userData); // This logs the user in instantly
-      
+
     } catch (err) {
       console.error("Login verification failed:", err);
       alert('Google Login failed.');
@@ -101,8 +101,8 @@ export function Auth({ onLogin }: AuthProps) {
                     Native App Authentication
                   </p>
                   <GoogleOAuthProvider clientId={ANDROID_CLIENT_ID}>
-                    <GoogleLogin 
-                      onSuccess={handleDirectGoogleLoginSuccess} 
+                    <GoogleLogin
+                      onSuccess={handleDirectGoogleLoginSuccess}
                       onError={() => alert('App Sign-In failed')}
                       useOneTap
                       theme="filled_black"
@@ -115,12 +115,12 @@ export function Auth({ onLogin }: AuthProps) {
               ) : (
                 /* WEB APP PATH */
                 <div className="supabase-google-auth" style={{ width: '100%' }}>
-                  <button 
-                    onClick={handleSupabaseGoogleLogin} 
+                  <button
+                    onClick={handleSupabaseGoogleLogin}
                     className="google-signin-btn"
                     style={{ background: '#111', color: '#fff', border: '1px solid #333', display: 'flex', justifyContent: 'center', padding: '12px', borderRadius: '24px', width: '300px', margin: '0 auto', fontSize: '15px' }}
                   >
-                    <img src="https://lh3.googleusercontent.com/COxitqgJr1sICpeqCu7IFH7I64k3-7B14mRLeuS60B8_8D-0v6S6_08I3vj7U8-p-n0=w300" alt="Google" style={{width: '20px', height: '20px', background: '#fff', borderRadius: '50%', padding: '2px', marginRight: '8px'}} />
+                    <img src="https://lh3.googleusercontent.com/COxitqgJr1sICpeqCu7IFH7I64k3-7B14mRLeuS60B8_8D-0v6S6_08I3vj7U8-p-n0=w300" alt="Google" style={{ width: '20px', height: '20px', background: '#fff', borderRadius: '50%', padding: '2px', marginRight: '8px' }} />
                     Sign in with Google
                   </button>
                 </div>
@@ -136,7 +136,7 @@ export function Auth({ onLogin }: AuthProps) {
         <p style={{ fontSize: '12px', color: '#5f6368', textAlign: 'center', lineHeight: '1.6' }}>
           By signing in, you agree to the Terms of Service. Your account information will be stored securely.
         </p>
-        
+
         {/* Helper debug text to verify platform logic */}
         <p style={{ fontSize: '10px', color: '#ccc', textAlign: 'center', marginTop: '20px' }}>
           Running Mode: {isFlutterApp ? 'Flutter Mobile App' : 'Browser Web App'}
