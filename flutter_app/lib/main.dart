@@ -1,9 +1,10 @@
 import 'dart:io';
+import 'dart:convert'; // Added for jsonEncode
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-import 'dart:convert';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:ytm_clone/services/google_auth_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,8 +36,6 @@ void main() async {
           request.response.headers.contentType = ContentType('image', 'svg+xml');
         } else if (path.endsWith('.png')) {
           request.response.headers.contentType = ContentType('image', 'png');
-        } else if (path.endsWith('.jpg') || path.endsWith('.jpeg')) {
-          request.response.headers.contentType = ContentType('image', 'jpeg');
         } else if (path.endsWith('.json')) {
           request.response.headers.contentType = ContentType.json;
         }
@@ -44,13 +43,12 @@ void main() async {
         request.response.add(bytes);
       } catch (e) {
         request.response.statusCode = HttpStatus.notFound;
-        debugPrint("Asset load error: $e");
       } finally {
         await request.response.close();
       }
     });
   } catch (e) {
-    debugPrint("Critical Server Error: $e");
+    debugPrint("Server Error: $e");
   }
 
   runApp(const MaterialApp(
@@ -66,34 +64,9 @@ class YTMApp extends StatefulWidget {
 }
 
 class _YTMAppState extends State<YTMApp> {
+  final GoogleAuthService _authService = GoogleAuthService();
   InAppWebViewController? _webViewController;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
 
-  // Integrated Native Sign-In Handler
-  Future<void> _handleNativeGoogleSignIn() async {
-    try {
-      final GoogleSignInAccount? account = await _googleSignIn.signIn();
-      
-      if (account != null && _webViewController != null) {
-        // Create a structured Map for the data
-        final Map<String, dynamic> userData = {
-          "email": account.email,
-          "full_name": account.displayName,
-          "id": account.id,
-          "avatar_url": account.photoUrl,
-        };
-        
-        // Convert to JSON and send to React
-        final String userJson = jsonEncode(userData);
-        await _webViewController!.evaluateJavascript(
-          source: 'window.onNativeLoginSuccess($userJson)'
-        );
-      }
-    } catch (error) {
-      debugPrint("Google Sign-In Error: $error");
-    }
-  }
-  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -101,6 +74,7 @@ class _YTMAppState extends State<YTMApp> {
       body: SafeArea(
         child: Stack(
           children: [
+            // WebView Layer
             InAppWebView(
               initialUrlRequest: URLRequest(
                 url: WebUri("http://localhost:8080/index.html"), 
@@ -114,17 +88,6 @@ class _YTMAppState extends State<YTMApp> {
               ),
               onWebViewCreated: (controller) {
                 _webViewController = controller;
-
-                // Set up the JavaScript Handler for 'FlutterAuth'
-                controller.addJavaScriptHandler(
-                  handlerName: 'FlutterAuth',
-                  callback: (args) {
-                    // This triggers when React calls: window.flutter_inappwebview.callHandler('FlutterAuth', 'triggerGoogleLogin')
-                    if (args.isNotEmpty && args[0] == 'triggerGoogleLogin') {
-                      _handleNativeGoogleSignIn();
-                    }
-                  },
-                );
               },
               onReceivedError: (controller, request, error) {
                 if (request.url.toString().contains("localhost:8080")) {
@@ -133,6 +96,51 @@ class _YTMAppState extends State<YTMApp> {
                   });
                 }
               },
+            ),
+            
+            // Native Auth Button
+            Positioned(
+              bottom: 20,
+              right: 20,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.redAccent,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                ),
+                onPressed: () async {
+                  // 1. Trigger Google Sign In
+                  await _authService.handleSignIn();
+                  
+                  // 2. Get the synced User from Supabase
+                  final user = Supabase.instance.client.auth.currentUser;
+
+                  if (user != null && _webViewController != null) {
+                    // 3. Prepare data for the React App
+                    final userData = {
+                      "id": user.id,
+                      "email": user.email,
+                      "full_name": user.userMetadata?['full_name'] ?? 'User',
+                      "avatar_url": user.userMetadata?['avatar_url'] ?? '',
+                    };
+
+                    String jsonUser = jsonEncode(userData);
+                    
+                    // 4. Inject into the WebView to trigger the Redirect in Auth.tsx
+                    await _webViewController!.evaluateJavascript(source: """
+                      if (window.onNativeLoginSuccess) {
+                        window.onNativeLoginSuccess($jsonUser);
+                      } else {
+                        console.error('Web App bridge not ready');
+                      }
+                    """);
+                  }
+                },
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Text("Sign in with Google"),
+                ),
+              ),
             ),
           ],
         ),
