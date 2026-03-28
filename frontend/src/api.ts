@@ -1,4 +1,5 @@
-const BASE = window.location.hostname === 'localhost' ? "http://localhost:5000/api" : `http://${window.location.hostname}:5000/api`;
+const isLocal = window.location.hostname === "localhost" || window.location.hostname.match(/^\d+\.\d+\.\d+\.\d+$/);
+const BASE = isLocal ? `http://${window.location.hostname}:5000/api` : "/api";
 
 export interface Song {
   type: "song" | "video";
