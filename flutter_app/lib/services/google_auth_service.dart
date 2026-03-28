@@ -20,10 +20,10 @@ class GoogleAuthService {
 
         // --- THE MISSING STEP: SYNC WITH SUPABASE ---
         await Supabase.instance.client.auth.signInWithIdToken(
-          provider: OAuthProvider.google,
-          idToken: idToken,
-          accessToken: accessToken,
-        );
+  provider: OAuthProvider.google,
+  idToken: googleAuth.idToken!,
+  accessToken: googleAuth.accessToken,
+);
 
         debugPrint("Supabase Profile Created/Synced Successfully!");
       }
