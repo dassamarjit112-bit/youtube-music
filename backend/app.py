@@ -243,7 +243,7 @@ def artist(browse_id):
     try:
         data = yt.get_artist(browse_id)
         # Handle cases where sections might be lists directly or have "results"
-        song_data = data.get("songs", {})
+        song_data = data.get("songs") or {}
         if isinstance(song_data, list):
             songs_raw = song_data
         else:
@@ -251,6 +251,8 @@ def artist(browse_id):
             res_data = song_data.get("results")
             if not isinstance(res_data, list):
                 res_data = song_data.get("items", [])
+            songs_raw = res_data
+        
         songs_list = limit_items(songs_raw, 12)
         songs = [fmt_song(s) for s in songs_list]
         
@@ -368,4 +370,4 @@ def new_releases():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run(host="0.0.0.0", debug=True, port=5000)

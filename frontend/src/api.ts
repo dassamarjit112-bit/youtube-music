@@ -1,4 +1,4 @@
-const BASE = import.meta.env.PROD || window.location.hostname !== 'localhost' ? "http://192.168.1.7:5000/api" : "http://localhost:5000/api";
+const BASE = window.location.hostname === 'localhost' ? "http://localhost:5000/api" : `http://${window.location.hostname}:5000/api`;
 
 export interface Song {
   type: "song" | "video";
