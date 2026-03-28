@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import {
   Play, Pause, SkipBack, SkipForward, Shuffle, Repeat,
   Volume2, ThumbsUp, MoreVertical, Search,
-  Home, Compass, Library, PlusCircle, Tv, ArrowLeft, Music2, Menu
+  Home, Compass, Library, PlusCircle, ArrowLeft, Music2, Menu
 } from "lucide-react";
 import { api } from "./api";
 import type { Song, HomeSection, SearchResult, ArtistDetail, AlbumDetail } from "./api";
