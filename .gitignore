@@ -1,15 +1,7 @@
 # Python / Backend
-.venv/
-__pycache__/
-*.pyc
-backend/__pycache__/
-.env
 
 # Node.js / Frontend
-node_modules/
-frontend/node_modules/
-package-lock.json
-frontend/dist/
+
 
 # IDE / General
 .vscode/
@@ -19,14 +11,7 @@ frontend/dist/
 
 # Flutter App (Android/IOS)
 # Ignore build artifacts but follow custom inclusions
-flutter_app/.dart_tool/
-flutter_app/.flutter-plugins*
-flutter_app/.pub/
-flutter_app/.pub-cache/
-flutter_app/.packages
-flutter_app/build/
+
 
 # UN-IGNORE specific build results for tracking
-!flutter_app/build/app/outputs/flutter-apk/*.apk
-!flutter_app/build/app/outputs/bundle/release/*.aab
-!flutter_app/assets/www/
+

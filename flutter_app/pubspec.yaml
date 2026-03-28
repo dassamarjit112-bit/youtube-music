@@ -4,32 +4,24 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  # FIX: Increased minimum SDK to 3.8.0 to support flutter_lints 6.0.0
   sdk: '>=3.8.0 <4.0.0'
 
 dependencies:
   flutter:
     sdk: flutter
-  # Update this line specifically
   flutter_inappwebview: ^6.1.0+1 
-  # ... your other dependencies (google_sign_in, etc.)
-  
-  cupertino_icons: ^1.0.8
-  google_sign_in: ^6.2.1
+  google_sign_in: ^6.3.0
+  supabase_flutter: ^2.5.0
   http: ^1.1.0
+  cupertino_icons: ^1.0.8
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  # This package specifically requires Dart SDK >= 3.8.0
   flutter_lints: ^6.0.0
 
 flutter:
   uses-material-design: true
   assets:
     - assets/www/
-    # If Vite has a subfolder for assets, add it too:
     - assets/www/assets/
-    
-
-  
