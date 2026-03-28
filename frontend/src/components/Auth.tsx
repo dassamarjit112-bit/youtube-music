@@ -25,13 +25,20 @@ export function Auth({ onLogin }: AuthProps) {
     (window as any).onNativeLoginSuccess = async (nativeUserData: any) => {
       setLoading(true);
       try {
-        // Upsert direct into profiles table
-        const { error } = await supabase.from('profiles').upsert(nativeUserData);
-        if (error) throw error;
+        // Map native data to our profile schema (sub -> id, picture -> avatar_url)
+        const userToSync = {
+          id: nativeUserData.id || nativeUserData.sub,
+          email: nativeUserData.email,
+          full_name: nativeUserData.name || nativeUserData.full_name || 'User',
+          avatar_url: nativeUserData.picture || nativeUserData.avatar_url || '',
+        };
 
-        // Update state to trigger smooth redirect to home
-        localStorage.setItem('ytm_user', JSON.stringify(nativeUserData));
-        onLogin(nativeUserData); // Logs the user in instantly
+        // Sync to profiles
+        const { error: upsertError } = await supabase.from('profiles').upsert(userToSync);
+        if (upsertError) console.error("Native Profile sync error:", upsertError.message);
+
+        localStorage.setItem('ytm_user', JSON.stringify(userToSync));
+        onLogin(userToSync);
       } catch (err) {
         console.error("Flutter App Sync failed:", err);
         alert('App Authentication failed.');

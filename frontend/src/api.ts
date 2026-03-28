@@ -1,5 +1,9 @@
 const isLocal = window.location.hostname === "localhost" || window.location.hostname.match(/^\d+\.\d+\.\d+\.\d+$/);
-const BASE = isLocal ? `http://${window.location.hostname}:5000/api` : "/api";
+const isFlutter = window.location.port === "8080";
+
+// For the APK (Flutter), we use the production API exclusively 
+// because port 5000 on a phone refers to the phone itself, not the PC.
+const BASE = (isFlutter && isLocal) ? "/api" : (isLocal ? `http://${window.location.hostname}:5000/api` : "/api");
 
 export interface Song {
   type: "song" | "video";

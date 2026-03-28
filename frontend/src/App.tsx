@@ -222,20 +222,31 @@ function App() {
       return;
     }
     // Fallback: check Supabase session (e.g. after OAuth redirect or page refresh)
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
         const u = {
           id: session.user.id,
-          email: session.user.email ?? '',
+          email: session.user.email,
           full_name: session.user.user_metadata?.full_name ?? session.user.email?.split('@')[0] ?? '',
           avatar_url: session.user.user_metadata?.avatar_url ?? '',
         };
+        
+        // Fix: Automatically sync metadata to Profiles table
+        try {
+          await supabase.from('profiles').upsert(u);
+          console.log("🔥 Profile Synced:", u.full_name);
+        } catch (e) {
+          console.warn("Profile sync delay:", e);
+        }
+
         localStorage.setItem('ytm_user', JSON.stringify(u));
         setUser(u);
         fetchFavorites(u.id);
         fetchHistory(u.id);
       }
     });
+
+    return () => subscription.unsubscribe();
   }, [user?.id]);
 
 
