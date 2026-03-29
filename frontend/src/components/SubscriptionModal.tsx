@@ -107,84 +107,69 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ user, isOp
       setLoading(false);
     }
   };
-
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+    <div className="modal-overlay">
       <motion.div 
-        className="w-full max-w-2xl bg-[#0f0f0f] border border-[#333] rounded-3xl overflow-hidden shadow-2xl"
+        className="modal-card"
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
       >
-        <div className="p-6 md:p-8">
-          <div className="flex justify-between items-center mb-8">
-            <div className="flex items-center gap-3">
-              <img src="/logo.png" className="w-10 h-10" alt="" />
-              <h2 className="text-2xl font-bold text-white">MusicTube Premium</h2>
-            </div>
-            <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
-              <X className="text-gray-400" />
-            </button>
+        <div className="modal-header">
+          <div className="brand">
+            <img src="/logo.png" alt="" />
+            <h2>MusicTube Premium</h2>
           </div>
+          <button onClick={onClose} className="modal-close">
+            <X size={24} />
+          </button>
+        </div>
 
-          <div className="grid md:grid-cols-2 gap-6 mb-8">
+        <div className="modal-body">
+          <div className="modal-grid">
             {/* Basic Plan */}
-            <div className="p-6 rounded-2xl bg-white/5 border border-white/10 hover:border-purple-500/50 transition-all group flex flex-col">
-              <div className="flex items-center gap-2 mb-4 text-purple-400">
-                <Zap size={20} />
-                <span className="font-semibold uppercase text-xs tracking-wider">Lifetime Basic</span>
+            <div className="modal-plan-card">
+              <div className="plan-type">
+                <Zap size={16} /> Lifetime Basic
               </div>
-              <h3 className="text-3xl font-bold text-white mb-2">₹199</h3>
-              <p className="text-gray-400 text-sm mb-6">Support the developer and get lifetime access to MusicTube.</p>
+              <h3 className="plan-price">₹199</h3>
+              <p className="plan-desc">Support the developer and get lifetime access to MusicTube.</p>
               
-              <ul className="space-y-3 mb-8 flex-grow">
-                <li className="flex items-center gap-2 text-sm text-gray-300">
-                  <Check size={16} className="text-green-500" /> Lifetime access
-                </li>
-                <li className="flex items-center gap-2 text-sm text-gray-300">
-                  <Check size={16} className="text-green-500" /> All core features
-                </li>
-                <li className="flex items-center gap-2 text-sm text-gray-400">
-                  <Shield size={16} className="text-gray-500" /> Contains Ads
-                </li>
+              <ul className="plan-feats">
+                <li><Check size={16} color="#4caf50" /> Lifetime access</li>
+                <li><Check size={16} color="#4caf50" /> All core features</li>
+                <li><Shield size={16} color="#aaa" /> Contains Ads</li>
               </ul>
 
               <button 
                 disabled={loading || user?.subscription_tier === 'basic' || user?.subscription_tier === 'premium'}
                 onClick={() => handleRazorpay('Basic', 199)}
-                className="w-full py-3 rounded-xl bg-white text-black font-bold hover:bg-gray-200 transition-colors disabled:opacity-50"
+                className="modal-pay-btn"
               >
                 {user?.subscription_tier === 'basic' || user?.subscription_tier === 'premium' ? 'Current Tier' : 'Buy Now'}
               </button>
             </div>
 
             {/* Premium Plan */}
-            <div className="p-6 rounded-2xl bg-gradient-to-br from-purple-900/20 to-blue-900/20 border border-purple-500/30 hover:border-purple-500 transition-all group relative overflow-hidden flex flex-col">
-              <div className="absolute top-0 right-0 bg-purple-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg uppercase tracking-tighter">Recommended</div>
-              <div className="flex items-center gap-2 mb-4 text-yellow-400">
-                <Star size={20} fill="currentColor" />
-                <span className="font-semibold uppercase text-xs tracking-wider">Lifetime Pro</span>
+            <div className="modal-plan-card pro">
+              <div className="rec-badge">Recommended</div>
+              <div className="plan-type">
+                <Star size={16} fill="currentColor" /> Lifetime Pro
               </div>
-              <h3 className="text-3xl font-bold text-white mb-2">₹399</h3>
-              <p className="text-gray-400 text-sm mb-6">The ultimate music experience. No interruptions, ever.</p>
+              <h3 className="plan-price">₹399</h3>
+              <p className="plan-desc">The ultimate music experience. No interruptions, ever.</p>
               
-              <ul className="space-y-3 mb-8 flex-grow">
-                <li className="flex items-center gap-2 text-sm text-gray-300">
-                  <Check size={16} className="text-green-500" /> Ad-Free Experience
-                </li>
-                <li className="flex items-center gap-2 text-sm text-gray-300">
-                  <Check size={16} className="text-green-500" /> Future App Updates
-                </li>
-                <li className="flex items-center gap-2 text-sm text-gray-300">
-                  <Check size={16} className="text-green-500" /> Priority Support
-                </li>
+              <ul className="plan-feats">
+                <li><Check size={16} color="#4caf50" /> Ad-Free Experience</li>
+                <li><Check size={16} color="#4caf50" /> Future App Updates</li>
+                <li><Check size={16} color="#4caf50" /> Priority Support</li>
               </ul>
 
               <button 
                 disabled={loading || user?.subscription_tier === 'premium'}
                 onClick={() => handleRazorpay('Premium', 399)}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold hover:opacity-90 transition-all disabled:opacity-50"
+                className="modal-pay-btn"
               >
                 {user?.subscription_tier === 'premium' 
                   ? 'Current Tier' 
@@ -193,26 +178,24 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ user, isOp
             </div>
           </div>
 
-          <div className="pt-6 border-t border-white/10">
-            <p className="text-sm text-gray-400 mb-4 flex items-center gap-2"><Gift size={16} /> Have a gift code?</p>
-            <div className="flex gap-2">
+          <div className="modal-gift-section">
+            <p><Gift size={18} /> Have a gift code?</p>
+            <div className="gift-inputs">
               <input 
                 type="text" 
                 placeholder="Enter code"
                 readOnly={loading}
                 value={giftCode}
                 onChange={(e) => setGiftCode(e.target.value)}
-                className="flex-grow bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-purple-500"
               />
               <button 
                 disabled={loading || !giftCode.trim()}
                 onClick={handleGiftCode}
-                className="px-6 py-2 bg-white/10 text-white rounded-xl hover:bg-white/20 transition-colors disabled:opacity-50"
               >
-                Redeem
+                {loading ? '...' : 'Redeem'}
               </button>
             </div>
-            {giftError && <p className="text-red-500 text-xs mt-2">{giftError}</p>}
+            {giftError && <p style={{ color: '#ff4444', fontSize: '12px', marginTop: '8px' }}>{giftError}</p>}
           </div>
         </div>
       </motion.div>

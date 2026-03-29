@@ -1,13 +1,15 @@
-// PRODUCTION API URL (Set this in your Vercel/Netlify Environment Variables)
-const PROD_API = import.meta.env.VITE_API_BASE_URL || "https://your-backend-on-render.com/api"; 
-
-// Detect if running inside Flutter WebView or local development
+// BASE API CONFIGuration
+// For local development on PC, use localhost:5000.
+// For production (Vercel), use relative /api.
 const isLocal = window.location.hostname === "localhost" || window.location.hostname.match(/^127\./) || window.location.hostname.match(/^192\./);
 const isFlutter = /wv|flutter/i.test(navigator.userAgent) || window.location.port === "8080";
 
-// For the Flutter App (APK), we MUST use a Public IP or Cloud URL
-// If running without PC, set "VITE_API_BASE_URL" in your build.
-const BASE = isLocal ? (isFlutter ? "http://192.168.1.3:5000/api" : `http://${window.location.hostname}:5000/api`) : PROD_API;
+// Replace 'https://musictube-production.vercel.app' with your ACTUAL Vercel URL after deployment.
+const PROD_URL = "https://musictube-mt.vercel.app/api";
+
+const BASE = isLocal
+  ? (isFlutter ? "http://192.168.1.3:5000/api" : `http://${window.location.hostname}:5000/api`)
+  : (isFlutter ? PROD_URL : "/api");
 
 export interface Song {
   type: "song" | "video";

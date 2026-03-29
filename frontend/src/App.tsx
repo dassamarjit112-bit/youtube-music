@@ -1491,19 +1491,26 @@ function App() {
 
       {/* Mobile Bottom Navigation */}
       <div className="bottom-nav mobile-only">
-        <button onClick={() => navigateTo({ name: 'home' })} className={view.name === 'home' ? 'active' : ''}>
+        <button onClick={() => setView({ name: 'home' })} className={view.name === 'home' ? 'active' : ''}>
           <Home size={22} />
           <span>Home</span>
         </button>
-        <button onClick={() => navigateTo({ name: 'explore' })} className={view.name === 'explore' ? 'active' : ''}>
+        <button onClick={() => setView({ name: 'explore' })} className={view.name === 'explore' ? 'active' : ''}>
           <Compass size={22} />
           <span>Explore</span>
         </button>
-        <button onClick={() => navigateTo({ name: 'library' })} className={view.name === 'library' ? 'active' : ''}>
+        <button onClick={() => setView({ name: 'library' })} className={view.name === 'library' ? 'active' : ''}>
           <Library size={22} />
           <span>Library</span>
         </button>
       </div>
+
+      <SubscriptionModal 
+        user={user} 
+        isOpen={showSubscriptionModal} 
+        onClose={() => setShowSubscriptionModal(false)}
+        onRefreshUser={(u) => setUser(u)}
+      />
     </div>
   );
 }
