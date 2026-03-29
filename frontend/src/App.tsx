@@ -30,11 +30,15 @@ const FALLBACK_THUMB = "https://images.unsplash.com/photo-1470225620780-dba8ba36
 
 function App() {
   const [view, setView] = useState<View>(() => {
-    const saved = localStorage.getItem('ytm_user');
-    const u = saved ? JSON.parse(saved) : null;
-    if (!u) return { name: "account" };
-    if (!u.subscription_tier) return { name: "plans" };
-    return { name: "home" };
+    try {
+      const saved = localStorage.getItem('ytm_user');
+      const u = saved ? JSON.parse(saved) : null;
+      if (!u) return { name: "account" };
+      if (!u.subscription_tier) return { name: "plans" };
+      return { name: "home" };
+    } catch {
+      return { name: "account" };
+    }
   });
   const [homeData, setHomeData] = useState<HomeSection[]>([]);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -100,21 +104,30 @@ function App() {
     const savedSong = localStorage.getItem("ytm_currentSong");
     const savedView = localStorage.getItem("ytm_view");
     
-    if (savedFavs) setFavorites(JSON.parse(savedFavs));
-    if (savedDLs) setDownloads(JSON.parse(savedDLs));
-    if (savedPlaylists) setPlaylists(JSON.parse(savedPlaylists));
-    if (savedSong) setCurrentSong(JSON.parse(savedSong));
-    
-    // Load user and subscription state
-    const storedUser = localStorage.getItem("ytm_user");
-    if (storedUser) {
-      const u = JSON.parse(storedUser);
-      if (!u.subscription_tier) {
-        setView({ name: 'plans' });
-      } else if (savedView) {
-        setView(JSON.parse(savedView));
+    try {
+      if (savedFavs) setFavorites(JSON.parse(savedFavs));
+      if (savedDLs) setDownloads(JSON.parse(savedDLs));
+      if (savedPlaylists) setPlaylists(JSON.parse(savedPlaylists));
+      if (savedSong) setCurrentSong(JSON.parse(savedSong));
+      
+      // Load user and subscription state
+      const storedUser = localStorage.getItem("ytm_user");
+      if (storedUser) {
+        const u = JSON.parse(storedUser);
+        if (!u.subscription_tier) {
+          setView({ name: 'plans' });
+        } else if (savedView) {
+          try {
+            setView(JSON.parse(savedView));
+          } catch {
+            setView({ name: 'home' });
+          }
+        }
+      } else {
+        setView({ name: 'home' });
       }
-    } else {
+    } catch (e) {
+      console.warn("Storage hydration failed:", e);
       setView({ name: 'home' });
     }
   }, [user]);
@@ -899,7 +912,7 @@ function App() {
                 </div>
               </div>
             ) : (
-              <button className="sign-in-btn-sm" style={{ display: /wv|flutter/i.test(navigator.userAgent) || window.location.port === '8080' ? 'none' : 'block' }} onClick={() => setView({ name: 'account' })}>Sign In</button>
+              <button className="sign-in-btn-sm" onClick={() => setView({ name: 'account' })}>Sign In</button>
             )}
           </div>
         </header>

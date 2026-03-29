@@ -1,15 +1,18 @@
 // BASE API CONFIGuration
 // For local development on PC, use localhost:5000.
 // For production (Vercel), use relative /api.
-const isLocal = window.location.hostname === "localhost" || window.location.hostname.match(/^127\./) || window.location.hostname.match(/^192\./);
-const isFlutter = /wv|flutter/i.test(navigator.userAgent) || window.location.port === "8080";
+const isLocal = window.location.hostname === "localhost" || 
+                /^127\./.test(window.location.hostname) || 
+                /^10\./.test(window.location.hostname) || 
+                /^172\.(1[6-9]|2[0-9]|3[01])\./.test(window.location.hostname) || 
+                /^192\.168\./.test(window.location.hostname);
 
-// Replace 'https://musictube-production.vercel.app' with your ACTUAL Vercel URL after deployment.
-const PROD_URL = "https://musictube-mt.vercel.app/api";
+const isFlutter = (window as any).flutter_inappwebview !== undefined;
 
-const BASE = isLocal
-  ? (isFlutter ? "http://192.168.1.3:5000/api" : `http://${window.location.hostname}:5000/api`)
-  : (isFlutter ? PROD_URL : "/api");
+// Use relative /api for typical web, but need explicit IP for Flutter APK
+const BASE = isFlutter
+  ? "http://192.168.1.3:5000/api" 
+  : (isLocal ? `http://${window.location.hostname}:5000/api` : "/api");
 
 export interface Song {
   type: "song" | "video";

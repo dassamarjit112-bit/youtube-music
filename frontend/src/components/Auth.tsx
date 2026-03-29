@@ -11,18 +11,20 @@ export function Auth({ onLogin }: AuthProps) {
   const [loading, setLoading] = useState(false);
   const [isFlutterApp, setIsFlutterApp] = useState(false);
 
+  const [isSyncing, setIsSyncing] = useState(false);
+
   useEffect(() => {
     const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
     const isWebView =
-      /wv/i.test(userAgent) ||
-      /flutter/i.test(userAgent) ||
-      (window as any).flutter_inappwebview !== undefined ||
-      window.location.port === '8080';
+      (/flutter/i.test(userAgent) || (window as any).flutter_inappwebview !== undefined) &&
+      window.location.port !== '8080';
 
     setIsFlutterApp(isWebView);
+    if (isWebView) setIsSyncing(true);
 
     (window as any).onNativeLoginSuccess = async (nativeUserData: any) => {
       setLoading(true);
+      setIsSyncing(false);
       try {
         const userToSync = {
           id: nativeUserData.id || nativeUserData.sub,
@@ -43,8 +45,17 @@ export function Auth({ onLogin }: AuthProps) {
       }
     };
 
+    // Auto-timeout for sync (if stuck on mobile browser wrongly identified)
+    let syncTimeout: ReturnType<typeof setTimeout>;
+    if (isWebView) {
+      syncTimeout = setTimeout(() => {
+        setIsSyncing(false);
+      }, 5000); // 5 sec fallback
+    }
+
     return () => {
       delete (window as any).onNativeLoginSuccess;
+      if (syncTimeout) clearTimeout(syncTimeout);
     };
   }, [onLogin]);
 
@@ -63,8 +74,14 @@ export function Auth({ onLogin }: AuthProps) {
     }
   };
 
-  if (isFlutterApp) {
-    return <div className="app-loader">MusicTube Auth Removed. Syncing...</div>;
+  if (isFlutterApp && isSyncing) {
+    return (
+      <div className="app-loader-container">
+        <div className="mini-loader" />
+        <p>Syncing your profile...</p>
+        <button className="bypass-btn" onClick={() => setIsSyncing(false)}>Skip Sync</button>
+      </div>
+    );
   }
 
   return (
@@ -94,7 +111,7 @@ export function Auth({ onLogin }: AuthProps) {
               <div className="mini-loader" />
             ) : (
               <>
-                <img src="google.png" className="google-icon-v2" />
+                <img src="https://www.gstatic.com/images/branding/googleg/1x/googleg_standard_color_128dp.png" className="google-icon-v2" />
                 Sign in with Google
               </>
             )}
