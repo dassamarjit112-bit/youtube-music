@@ -35,8 +35,13 @@ else:
     yt = YTMusic()
 
 def safe_thumb(thumbs):
-    if not thumbs: return "https://music.youtube.com/img/on_media_mc.png"
-    return sorted(thumbs, key=lambda t: t.get("width", 0), reverse=True)[0].get("url", "")
+    if not thumbs: return "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&h=500&fit=crop"
+    url = sorted(thumbs, key=lambda t: t.get("width", 0), reverse=True)[0].get("url", "")
+    # Cleanup: remove existing size params and force high-res
+    if "googleusercontent.com" in url or "ggpht.com" in url:
+        base = url.split("=")[0]
+        return f"{base}=w544-h544-l90-rj"
+    return url
 
 def fmt_song(item):
     artist_data = item.get("artists", item.get("artist", []))

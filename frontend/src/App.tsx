@@ -26,6 +26,8 @@ type View =
   | { name: "plans" }
   | { name: "player" };
 
+const FALLBACK_THUMB = "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&h=500&fit=crop";
+
 function App() {
   const [view, setView] = useState<View>(() => {
     const saved = localStorage.getItem('ytm_user');
@@ -1185,11 +1187,11 @@ function App() {
                           }}
                         >
                         <img 
-                          src={item.thumbnail} 
-                          alt="" 
-                          className="row-thumb" 
-                          onError={(e) => { (e.target as any).src = 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=200&h=200&fit=crop'; }} 
-                        />
+  src={item.thumbnail} 
+  alt="" 
+  className="row-thumb" 
+  onError={(e) => { (e.target as any).src = FALLBACK_THUMB; }} 
+/>
                           <div className="row-info">
                             <h3>{item.title || item.name}</h3>
                             <p className="row-type-badge">{item.type}</p>
@@ -1380,7 +1382,12 @@ function App() {
                             </button>
                           </div>
                           <div className="player-art-container" onClick={() => setShowFloatingControls(!showFloatingControls)}>
-                            <img src={currentSong.thumbnail} className="player-art-v3" alt="" />
+                            <img 
+  src={currentSong.thumbnail} 
+  className="player-art-v3" 
+  alt="" 
+  onError={(e) => { (e.target as any).src = FALLBACK_THUMB; }}
+/>
                             <AnimatePresence>
                               {showFloatingControls && (
                                 <motion.div 
@@ -1419,19 +1426,19 @@ function App() {
                          </div>
                          <div className="player-queue-list">
                             {queue.map((s, i) => (
-                               <div 
-                                 key={i} 
-                                 className={`q-row-v3 ${s.videoId === currentSong.videoId ? 'active' : ''}`}
-                                 onClick={() => setCurrentSong(s)}
-                               >
-                                  <img src={s.thumbnail} alt="" />
-                                  <div className="q-info">
-                                     <p className="q-title">{s.title}</p>
-                                     <p className="q-artist">{s.artist}</p>
-                                  </div>
-                                  {s.videoId === currentSong.videoId && <div className="q-playing-icon"><Music2 size={16} /></div>}
-                               </div>
-                            ))}
+  <div 
+    key={i} 
+    className={`q-row-v3 ${s.videoId === currentSong.videoId ? 'active' : ''}`}
+    onClick={() => setCurrentSong(s)}
+  >
+     <img src={s.thumbnail} alt="" onError={(e) => { (e.target as any).src = FALLBACK_THUMB; }} />
+     <div className="q-info">
+        <p className="q-title">{s.title}</p>
+        <p className="q-artist">{s.artist}</p>
+     </div>
+     {s.videoId === currentSong.videoId && <div className="q-playing-icon"><Music2 size={16} /></div>}
+  </div>
+))}
                              
                              {autoPlay && (
                                <div className="auto-play-indicator">
