@@ -346,7 +346,7 @@ function App() {
 
 
   // Sync session loading
-  const isLoggedIn = !!user;
+  const isLoggedIn = user && !user.isGuest;
 
   // Fetch data on tab change (Allow even if not logged in for Home/Explore)
   useEffect(() => {
@@ -813,7 +813,7 @@ function App() {
           </button>
         </div>
         <nav>
-          <button onClick={() => navigateTo({ name: "home" })} className={`mobile-only ${view.name === "home" ? "active" : ""}`}>
+          <button onClick={() => navigateTo({ name: "home" })} className={view.name === "home" ? "active" : ""}>
             <Home size={24} /> <span>Home</span>
           </button>
           <button onClick={() => navigateTo({ name: "explore" })} className={view.name === "explore" ? "active" : ""}>
@@ -821,7 +821,7 @@ function App() {
           </button>
           <button 
             onClick={() => isLoggedIn ? navigateTo({ name: "library" }) : setView({ name: 'account' })} 
-            className={`mobile-only ${view.name === "library" ? "active" : ""}`}
+            className={view.name === "library" ? "active" : ""}
           >
             <Library size={24} /> <span>Library</span>
           </button>
