@@ -3542,7 +3542,9 @@ body {
   }
 
   .player-right {
-    display: none;
+    display: flex;
+    max-height: 50vh;
+    margin-top: 32px;
   }
 
   .player-controls-v3 {
@@ -3592,7 +3594,10 @@ body {
     gap: 32px;
   }
 
-  .player-right { display: none; }
+  .player-right {
+    display: flex;
+    max-height: 50vh;
+  }
   .player-controls-v3 { padding: 24px; }
 }
 
@@ -3696,7 +3701,19 @@ body {
     min-height: auto;
   }
 
-  .player-right { display: none; }
+  .player-right {
+    display: flex;
+    max-height: 60vh;
+    margin-top: 32px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+  }
+
+  .player-content-grid {
+    display: flex;
+    flex-direction: column;
+    padding: 20px 24px 100px;
+  }
 
   .player-art-v3 {
     width: 80%;

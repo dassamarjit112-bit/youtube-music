@@ -259,17 +259,31 @@ function App() {
     // Fallback: check Supabase session (e.g. after OAuth redirect or page refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user && !isWebView) {
+        // First sync/fetch user record
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+
         const u = {
           id: session.user.id,
           email: session.user.email,
-          full_name: session.user.user_metadata?.full_name ?? session.user.email?.split('@')[0] ?? '',
-          avatar_url: session.user.user_metadata?.avatar_url ?? '',
+          full_name: profile?.full_name ?? session.user.user_metadata?.full_name ?? session.user.email?.split('@')[0] ?? '',
+          avatar_url: profile?.avatar_url ?? session.user.user_metadata?.avatar_url ?? '',
+          subscription_tier: profile?.subscription_tier ?? 'free'
         };
         
-        // Fix: Automatically sync metadata to Profiles table
+        // Fix: Automatically sync metadata to Profiles table (don't overwrite subscription_tier if it exists)
         try {
-          await supabase.from('profiles').upsert(u);
-          console.log("🔥 Profile Synced:", u.full_name);
+          await supabase.from('profiles').upsert({
+            id: u.id,
+            email: u.email,
+            full_name: u.full_name,
+            avatar_url: u.avatar_url,
+            // subscription_tier is handled separately in DB usually
+          }, { onConflict: 'id' });
+          console.log("🔥 Profile Synced:", u.full_name, "| Tier:", u.subscription_tier);
         } catch (e) {
           console.warn("Profile sync delay:", e);
         }
@@ -278,6 +292,9 @@ function App() {
         setUser(u);
         fetchFavorites(u.id);
         fetchHistory(u.id);
+      } else if (_event === 'SIGNED_OUT') {
+        setUser(null);
+        localStorage.removeItem('ytm_user');
       }
     });
 
@@ -678,7 +695,8 @@ function App() {
   // ─── Login Screen ────────────────────────────────────────────────────────────
   // Removed strict login wall to allow Guest browsing
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     localStorage.removeItem("ytm_user");
     setUser(null);
     setView({ name: "home" });
@@ -1666,14 +1684,6 @@ function App() {
         >
           <Library size={24} />
           <span>Library</span>
-        </button>
-        <button 
-          className={view.name === "player" ? "active" : ""} 
-          onClick={() => currentSong && setView({ name: "player" })}
-          disabled={!currentSong}
-        >
-          <Play size={24} />
-          <span>Now Play</span>
         </button>
       </nav>
 
