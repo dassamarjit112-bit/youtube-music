@@ -30,6 +30,15 @@ function App() {
   const [isSearching, setIsSearching] = useState(false);
   const [user, setUser] = useState<any>(() => {
     try {
+      const isWebView = /wv/i.test(navigator.userAgent) || /flutter/i.test(navigator.userAgent) || window.location.port === '8080';
+      if (isWebView) {
+        return {
+          id: 'flutter_guest_id',
+          email: 'app@youtube.music',
+          full_name: 'My Music',
+          avatar_url: ''
+        };
+      }
       const saved = localStorage.getItem('ytm_user');
       return saved ? JSON.parse(saved) : null;
     } catch {
@@ -215,21 +224,19 @@ function App() {
 
   // App Session Listener
   useEffect(() => {
+    const isWebView = /wv/i.test(navigator.userAgent) || /flutter/i.test(navigator.userAgent) || window.location.port === '8080';
+    if (isWebView) {
+      if (user?.id) {
+        fetchFavorites(user.id);
+        fetchHistory(user.id);
+      }
+      return;
+    }
+
     // If already loaded from localStorage, just fetch dependent data
     if (user?.id) {
       fetchFavorites(user.id);
       fetchHistory(user.id);
-      return;
-    }
-    const isWebView = /wv/i.test(navigator.userAgent) || /flutter/i.test(navigator.userAgent) || window.location.port === '8080';
-    if (isWebView && !user) {
-      // Auto-skip auth for flutter app entirely
-      setUser({
-        id: 'flutter_guest_id',
-        email: 'app@youtube.music',
-        full_name: 'My Music',
-        avatar_url: ''
-      });
       return;
     }
 
@@ -1134,8 +1141,12 @@ function App() {
                         <div className="a-info">
                           <h2>{user?.full_name || user?.email?.split('@')[0]}</h2>
                           <p>{user?.email}</p>
-                          <button className="manage-acc">Manage Google Account</button>
-                          <button className="logout-btn-sh" onClick={handleLogout}>Logout</button>
+                          {user?.id !== 'flutter_guest_id' && (
+                            <>
+                              <button className="manage-acc">Manage Google Account</button>
+                              <button className="logout-btn-sh" onClick={handleLogout}>Logout</button>
+                            </>
+                          )}
                         </div>
                       </div>
                       
