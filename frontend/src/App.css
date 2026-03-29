@@ -1935,33 +1935,33 @@ body {
     display: none !important;
   }
 
-/* Mobile Bottom Navigation */
+/* Floating Bottom Navigation (Global) */
 .mobile-bottom-nav {
-  display: none !important; /* Hide on desktop */
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: auto;
+  min-width: 300px;
+  height: 64px;
+  background: rgba(18, 18, 18, 0.9);
+  backdrop-filter: blur(24px) saturate(180%);
+  border-radius: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+  display: flex !important;
+  justify-content: space-around;
+  align-items: center;
+  z-index: 2600;
+  padding: 0 12px;
 }
 
-  @media (max-width: 768px) {
-    .mobile-bottom-nav {
-      position: fixed;
-      bottom: 24px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: auto;
-      min-width: 60%; 
-      max-width: 80%;
-      height: 64px;
-      background: rgba(18, 18, 18, 0.9);
-      backdrop-filter: blur(24px) saturate(180%);
-      border-radius: 32px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
-      display: flex !important;
-      justify-content: space-around;
-      align-items: center;
-      z-index: 2600;
-      padding: 0 12px;
-    }
+@media (max-width: 768px) {
+  .mobile-bottom-nav {
+    min-width: 60%; 
+    max-width: 80%;
   }
+}
 
   .mobile-bottom-nav button {
     background: none;
@@ -3605,14 +3605,14 @@ body {
 }
 
 .player-floating-bottom {
-  position: absolute;
+  position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
   padding: 40px;
   display: flex;
   justify-content: center;
-  z-index: 100;
+  z-index: 5000;
   pointer-events: none;
 }
 

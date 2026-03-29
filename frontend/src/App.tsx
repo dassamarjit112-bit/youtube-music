@@ -136,11 +136,11 @@ function App() {
           setView({ name: 'plans' });
         }
       } else {
-        setView({ name: 'home' });
+        setView({ name: 'account' });
       }
     } catch (e) {
       console.warn("Storage hydration failed:", e);
-      setView({ name: 'home' });
+      setView({ name: 'account' });
     }
   }, [user]);
 
@@ -196,6 +196,10 @@ function App() {
       // YT.PlayerState: -1=unstarted, 0=ended, 1=playing, 2=paused, 3=buffering, 5=cued
       if (state === 1) setIsPlaying(true);
       else if (state === 2) setIsPlaying(false);
+      else if ((state === -1 || state === 5) && isPlayingRef.current) {
+         // Auto-play bridging: IFrame API often gets "stuck" unstarted/cued on mobile track changes.
+         setTimeout(() => ytPlayer.play(), 100);
+      }
     },
     onProgress: (p, secs) => {
       setPlayed(p);
@@ -557,18 +561,16 @@ function App() {
         setQueue(prevQueue => {
           const uBatch = nextBatch.filter(s => !prevQueue.find(sq => sq.videoId === s.videoId));
           const newQueue = [...prevQueue, ...uBatch];
-          // After adding new songs, if we were at the end, immediately play the next one
-          if (newQueue.length > prevQueue.length) {
-            setTimeout(() => {
-              const q = queueRef.current;
-              const currentIdx = q.findIndex(s => s.videoId === currentSongRef.current?.videoId);
-              if (currentIdx !== -1 && currentIdx < q.length - 1) {
-                setCurrentSong(q[currentIdx + 1]);
-              }
-            }, 300);
-          }
+          // We must safely move the song forward outside of state setting due to react batching.
           return newQueue;
         });
+
+        // Instantly jump to the first newly appended song to prevent buffering hangs!
+        const nextTarget = nextBatch.find(s => s.videoId !== lastSong.videoId);
+        if (nextTarget) {
+           setCurrentSong(nextTarget);
+           setIsPlaying(true); // Explicitly assert play state for next track
+        }
       }
     } catch (e) {
       console.error("Auto-play extension failed:", e);
