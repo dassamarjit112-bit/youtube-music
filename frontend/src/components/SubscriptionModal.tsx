@@ -17,7 +17,12 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ user, isOp
 
   const handleRazorpay = async (plan: string, amount: number) => {
     setLoading(true);
-    const keyId = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_placeholder';
+    const keyId = import.meta.env.VITE_RAZORPAY_KEY_ID;
+    if (!keyId || keyId.includes('PLACEHOLDER')) {
+      alert("Razorpay Key ID is not configured in .env file.");
+      setLoading(false);
+      return;
+    }
 
     const options = {
       key: keyId,

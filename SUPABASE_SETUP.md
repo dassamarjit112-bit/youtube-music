@@ -44,4 +44,5 @@ VALUES
 ---
 > [!IMPORTANT]
 > Ensure you have your Razorpay keys added to the `.env` file in the `frontend` directory.
-> `VITE_RAZORPAY_KEY_ID=rzp_test_YOUR_ID`
+> `VITE_RAZORPAY_KEY_ID=rzp_live_YOUR_KEY_ID`
+> `VITE_RAZORPAY_KEY_SECRET=YOUR_KEY_SECRET`
