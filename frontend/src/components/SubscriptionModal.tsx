@@ -106,33 +106,60 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ user, isOp
   };
 
   const handleGiftCode = async () => {
-    if (!giftCode.trim()) return;
+    const trimmedCode = giftCode.trim().toUpperCase();
+    if (!trimmedCode) return;
     setLoading(true);
     setGiftError('');
 
     try {
-      const { data, error } = await supabase
+      // Step 1: Look up the gift code (case-insensitive match)
+      const { data, error: fetchError } = await supabase
         .from('gift_codes')
-        .select('*')
-        .eq('code', giftCode.trim())
-        .eq('is_used', false)
+        .select('id, code, tier, is_used')
+        .ilike('code', trimmedCode)
         .single();
 
-      if (error || !data) {
-        setGiftError('Invalid or already used gift code.');
-      } else {
-        // Apply gift code
-        const { error: updateError } = await supabase
-          .from('gift_codes')
-          .update({ is_used: true, used_by: user.id })
-          .eq('id', data.id);
-        
-        if (!updateError) {
-          await updateSubscriptionInSupabase(data.tier === 'premium');
-        }
+      if (fetchError) {
+        console.error('Gift code fetch error:', fetchError.message);
+        setGiftError('Code not found. Check spelling and try again.');
+        return;
       }
-    } catch (e) {
-      setGiftError('An error occurred.');
+
+      if (!data) {
+        setGiftError('Gift code not found.');
+        return;
+      }
+
+      if (data.is_used) {
+        setGiftError('This gift code has already been used.');
+        return;
+      }
+
+      // Step 2: Mark the code as used
+      const { error: updateError } = await supabase
+        .from('gift_codes')
+        .update({ 
+          is_used: true, 
+          used_by: user?.id || null 
+        })
+        .eq('id', data.id)
+        .eq('is_used', false); // Double-check it wasn't used in between
+
+      if (updateError) {
+        console.error('Gift code update error:', updateError.message);
+        setGiftError('Failed to redeem code. Please try again.');
+        return;
+      }
+
+      // Step 3: Update user subscription
+      const isPremium = data.tier === 'premium';
+      await updateSubscriptionInSupabase(isPremium);
+      setGiftCode('');
+      onClose();
+
+    } catch (e: any) {
+      console.error('Gift code error:', e);
+      setGiftError('Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
