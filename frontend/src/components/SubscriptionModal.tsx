@@ -8,12 +8,17 @@ interface SubscriptionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onRefreshUser: (updatedUser: any) => void;
+  initialGiftCode?: string;
 }
 
-export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ user, isOpen, onClose, onRefreshUser }) => {
+export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ user, isOpen, onClose, onRefreshUser, initialGiftCode }) => {
   const [loading, setLoading] = useState(false);
-  const [giftCode, setGiftCode] = useState('');
+  const [giftCode, setGiftCode] = useState(initialGiftCode || '');
   const [giftError, setGiftError] = useState('');
+
+  React.useEffect(() => {
+    if (initialGiftCode) setGiftCode(initialGiftCode);
+  }, [initialGiftCode, isOpen]);
 
   const handleRazorpay = async (plan: string, originalAmount: number) => {
     setLoading(true);
@@ -62,20 +67,8 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ user, isOp
   const updateSubscriptionInSupabase = async (isPremium: boolean) => {
     if (!user?.id) return;
     const tier = isPremium ? 'premium' : 'basic';
-    // Use isGuest flag (consistent with App.tsx GUEST_USER)
-    const isGuestUser = user.isGuest === true;
     
-    // For Guests, we only update LocalStorage and refresh the UI
-    if (isGuestUser) {
-      console.log("Syncing Guest Offline Tier...");
-      const updated = { ...user, subscription_tier: tier, isGuest: false };
-      localStorage.setItem('ytm_user', JSON.stringify(updated));
-      onRefreshUser(updated);
-      alert(`🎉 Success! You are now a ${tier === 'premium' ? 'Premium Pro' : 'Basic'} member on this device!`);
-      return;
-    }
-
-    // For Registered Users, Sync to Supabase
+    // Registered Users, Sync to Supabase
     try {
       const { error } = await supabase
         .from('profiles')
@@ -98,7 +91,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ user, isOp
       }
     } catch (e: any) {
        console.error("Supabase sync failed:", e);
-       // Update local status so the user can use what they paid for immediately
+       // Local Fallback
        const updated = { ...user, subscription_tier: tier };
        localStorage.setItem('ytm_user', JSON.stringify(updated));
        onRefreshUser(updated);

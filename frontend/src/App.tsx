@@ -82,6 +82,7 @@ function App() {
   const [showPlaylistDialog, setShowPlaylistDialog] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [giftCodeToClaim, setGiftCodeToClaim] = useState('');
 
   const isPremium = user?.subscription_tier === 'premium';
   const [isShuffle, setIsShuffle] = useState(false);
@@ -1371,20 +1372,26 @@ function App() {
                               <button onClick={() => setView({ name: 'plans' })}>Upgrade Now</button>
                             </div>
                           )}
-                          {!user?.subscription_tier && (
+                          {(!user?.subscription_tier || user?.subscription_tier === 'free') && (
                             <button className="primary-acc-btn" onClick={() => setView({ name: 'plans' })}>Get MusicTube Premium</button>
                           )}
-                          <button className="secondary-acc-btn">Manage Membership</button>
+                          <button className="secondary-acc-btn" onClick={() => setView({ name: 'plans' })}>Manage Membership</button>
                         </div>
 
                         <div className="acc-card-v3">
                           <h3>Gift Codes</h3>
                           <p className="subtext">Have a code? Claim it to activate features.</p>
                           <div className="claim-row-v3">
-                            <input type="text" placeholder="Enter code" id="gift-input-acc" />
+                            <input 
+                              type="text" 
+                              placeholder="Enter code" 
+                              value={giftCodeToClaim}
+                              onChange={(e) => setGiftCodeToClaim(e.target.value)}
+                            />
                             <button onClick={() => {
-                              const input = document.getElementById('gift-input-acc') as HTMLInputElement;
-                              if (input.value) setShowSubscriptionModal(true); // Re-use gift logic from modal
+                              if (giftCodeToClaim.trim()) {
+                                setShowSubscriptionModal(true);
+                              }
                             }}>Claim</button>
                           </div>
                         </div>
@@ -1693,12 +1700,17 @@ function App() {
       <SubscriptionModal 
         user={user} 
         isOpen={showSubscriptionModal} 
-        onClose={() => setShowSubscriptionModal(false)}
+        onClose={() => {
+          setShowSubscriptionModal(false);
+          setGiftCodeToClaim('');
+        }}
         onRefreshUser={(u) => {
           setUser(u);
           setView({ name: 'home' });
           setShowSubscriptionModal(false);
+          setGiftCodeToClaim('');
         }}
+        initialGiftCode={giftCodeToClaim}
       />
 
       {/* Player Bar - Only visible to subscribers */}
@@ -1838,8 +1850,12 @@ function App() {
       <SubscriptionModal 
         user={user} 
         isOpen={showSubscriptionModal} 
-        onClose={() => setShowSubscriptionModal(false)}
+        onClose={() => {
+          setShowSubscriptionModal(false);
+          setGiftCodeToClaim('');
+        }}
         onRefreshUser={(u) => setUser(u)}
+        initialGiftCode={giftCodeToClaim}
       />
     </div>
   );
@@ -1874,7 +1890,9 @@ const FullScreenPlayer = ({
       transition={{ type: "spring", damping: 25, stiffness: 200 }}
     >
       <header className="mobile-player-header">
-        <button className="close-btn" onClick={onClose}><SkipBack size={24} style={{ transform: 'rotate(-90deg)' }} /></button>
+        <button className="close-btn" onClick={() => { onClose(); goBack(); }} title="Go Home">
+          <Home size={22} />
+        </button>
         <div className="title">Now Playing</div>
         <button className="more-btn" onClick={() => onShowMenu(song)}><MoreVertical size={24} /></button>
       </header>
