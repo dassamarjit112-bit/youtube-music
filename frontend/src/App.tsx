@@ -1328,7 +1328,11 @@ function App() {
                 <div className="account-view">
                   {!isLoggedIn ? (
                     <div className="guest-login-zone">
-                      <Auth onLogin={setUser} />
+                      <Auth onLogin={(u: any) => { 
+                        setUser(u);
+                        const hasPlan = u.subscription_tier && u.subscription_tier !== 'free';
+                        setView(hasPlan ? { name: 'home' } : { name: 'plans' });
+                      }} />
                     </div>
                   ) : (
                     <div className="acc-container-premium">
@@ -1542,16 +1546,7 @@ function App() {
                 </div>
               )}
 
-              {/* ── ACCOUNT / LOGIN ── */}
-              {view.name === "account" && (
-                <div className="account-view">
-                  <Auth onLogin={(u: any) => { 
-                    setUser(u);
-                    const hasPlan = u.subscription_tier && u.subscription_tier !== 'free';
-                    setView(hasPlan ? { name: 'home' } : { name: 'plans' });
-                  }} />
-                </div>
-              )}
+
       {/* ── PLAYER ── */}
           {view.name === "artist" && (
             <motion.div 
@@ -1691,7 +1686,11 @@ function App() {
         user={user} 
         isOpen={showSubscriptionModal} 
         onClose={() => setShowSubscriptionModal(false)}
-        onRefreshUser={(u) => setUser(u)}
+        onRefreshUser={(u) => {
+          setUser(u);
+          setView({ name: 'home' });
+          setShowSubscriptionModal(false);
+        }}
       />
 
       {/* Player Bar - Only visible to subscribers */}
