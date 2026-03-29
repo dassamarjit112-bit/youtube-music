@@ -65,31 +65,39 @@ class _MusicTubeAppState extends State<MusicTubeApp> {
 
   @override
   Widget build(BuildContext context) {
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+      systemNavigationBarColor: Colors.black,
+      systemNavigationBarIconBrightness: Brightness.light,
+    ));
+
     return Scaffold(
       backgroundColor: Colors.black,
-      body: SafeArea(
-        child: InAppWebView(
-          initialUrlRequest: URLRequest(
-            url: WebUri("http://localhost:8080/index.html"), 
-          ),
-          initialSettings: InAppWebViewSettings(
-            mediaPlaybackRequiresUserGesture: false,
-            allowsInlineMediaPlayback: true,
-            javaScriptEnabled: true,
-            domStorageEnabled: true,
-            mixedContentMode: MixedContentMode.MIXED_CONTENT_ALWAYS_ALLOW,
-          ),
-          onWebViewCreated: (controller) {
-            _webViewController = controller;
-          },
-          onReceivedError: (controller, request, error) {
-            if (request.url.toString().contains("localhost:8080")) {
-              Future.delayed(const Duration(milliseconds: 500), () {
-                controller.reload();
-              });
-            }
-          },
+      body: InAppWebView(
+        initialUrlRequest: URLRequest(
+          url: WebUri("http://localhost:8080/index.html"), 
         ),
+        initialSettings: InAppWebViewSettings(
+          mediaPlaybackRequiresUserGesture: false,
+          allowsInlineMediaPlayback: true,
+          javaScriptEnabled: true,
+          domStorageEnabled: true,
+          mixedContentMode: MixedContentMode.MIXED_CONTENT_ALWAYS_ALLOW,
+          useWideViewPort: true,
+          loadWithOverviewMode: true,
+          supportZoom: false,
+        ),
+        onWebViewCreated: (controller) {
+          _webViewController = controller;
+        },
+        onReceivedError: (controller, request, error) {
+          if (request.url.toString().contains("localhost:8080")) {
+            Future.delayed(const Duration(milliseconds: 500), () {
+              controller.reload();
+            });
+          }
+        },
       ),
     );
   }

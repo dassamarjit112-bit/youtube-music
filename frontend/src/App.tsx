@@ -22,7 +22,8 @@ type View =
   | { name: "account" }
   | { name: "artist"; id: string }
   | { name: "album"; id: string }
-  | { name: "playlist"; id: string };
+  | { name: "playlist"; id: string }
+  | { name: "plans" };
 
 function App() {
   const [view, setView] = useState<View>({ name: "home" });
@@ -99,15 +100,15 @@ function App() {
     if (savedFavs) setFavorites(JSON.parse(savedFavs));
     if (savedDLs) setDownloads(JSON.parse(savedDLs));
     if (savedPlaylists) setPlaylists(JSON.parse(savedPlaylists));
-    if (savedSong) {
-      const song = JSON.parse(savedSong);
-      setCurrentSong(song);
-      // Auto-resume queue if possible
-      const savedQueue = localStorage.getItem("ytm_queue");
-      if (savedQueue) setQueue(JSON.parse(savedQueue));
+    if (savedSong) setCurrentSong(JSON.parse(savedSong));
+    
+    // Auto-redirect to Plans if no subscription
+    if (user && !user.subscription_tier) {
+      setView({ name: 'plans' });
+    } else if (savedView) {
+      setView(JSON.parse(savedView));
     }
-    if (savedView) setView(JSON.parse(savedView));
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     localStorage.setItem("ytm_favorites", JSON.stringify(favorites));
@@ -1142,69 +1143,106 @@ function App() {
                       <Auth onLogin={setUser} />
                     </div>
                   ) : (
-                    <>
-                      <div className="account-header-v2">
+                    <div className="acc-container-premium">
+                      <div className="acc-header-v3">
                         {user?.avatar_url ? (
-                          <img
-                            src={user.avatar_url}
-                            alt={user.full_name}
-                            className="avatar-img-bg"
-                          />
+                          <img src={user.avatar_url} className="acc-pfp-v3" alt="" />
                         ) : (
-                          <div className="a-avatar">{(user?.full_name?.[0] || user?.email?.[0] || '?').toUpperCase()}</div>
+                          <div className="acc-pfp-v3-placeholder">{(user?.full_name?.[0] || user?.email?.[0] || '?').toUpperCase()}</div>
                         )}
-                        <div className="a-info">
-                          <h2>{user?.full_name || user?.email?.split('@')[0]}</h2>
+                        <div className="acc-pfp-info">
+                          <h1>{user?.full_name || 'My MusicTube'}</h1>
                           <p>{user?.email}</p>
-                          {user?.id !== 'flutter_guest_id' && (
-                            <>
-                              <button className="manage-acc">Manage Google Account</button>
-                              <button className="logout-btn-sh" onClick={handleLogout}>Logout</button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div className="account-menu">
-                        <div className="menu-group">
-                          {isWebView ? (
-                            <div className="menu-item premium-active">
-                              <div className="icon"><Play size={20} fill="#4caf50" color="#4caf50" /></div>
-                              <div className="txt">
-                                <h3>Music Premium</h3>
-                                <p>Subscription Active</p>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="menu-item premium" onClick={() => setShowSubscriptionModal(true)}>
-                              <div className="icon"><Star size={20} fill="#6600ff" color="#6600ff" /></div>
-                              <div className="txt">
-                                <h3>MusicTube Premium</h3>
-                                <p>{user?.subscription_tier === 'basic' ? 'Upgrade to Pro' : 'Lifetime Access'}</p>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="menu-group">
-                          <div className="menu-item" onClick={() => navigateTo({ name: 'library' })}>
-                            <div className="icon"><Library size={20} /></div>
-                            <span>Your Library</span>
-                          </div>
-                        </div>
-
-                        <div className="menu-group app-dl">
-                          <p>Native Mobile Experience</p>
-                          <div className="sub-card" style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', padding: '16px', borderRadius: '12px' }}>
-                            <span className="price">Full Background Play & Controls</span>
-                            <a href="/ytmusic.apk" download className="sub-btn-primary" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', background: '#3b82f6', color: '#fff', marginTop: '12px', padding: '8px', borderRadius: '8px' }}>
-                              Download APK
-                            </a>
+                          <div className={`tier-badge ${user?.subscription_tier === 'premium' ? 'pro' : 'base'}`}>
+                            {user?.subscription_tier === 'premium' ? 'Premium Pro' : (user?.subscription_tier === 'basic' ? 'Basic Member' : 'No Active Plan')}
                           </div>
                         </div>
                       </div>
-                    </>
+
+                      <div className="acc-sections-v3">
+                        <div className="acc-card-v3">
+                          <h3>Subscription & Payments</h3>
+                          {user?.subscription_tier === 'basic' && (
+                            <div className="upgrad-banner">
+                              <div className="txt">
+                                <b>Upgrade to Pro</b>
+                                <p>Get Ad-free experience and more.</p>
+                              </div>
+                              <button onClick={() => setView({ name: 'plans' })}>Upgrade Now</button>
+                            </div>
+                          )}
+                          {!user?.subscription_tier && (
+                            <button className="primary-acc-btn" onClick={() => setView({ name: 'plans' })}>Get MusicTube Premium</button>
+                          )}
+                          <button className="secondary-acc-btn">Manage Membership</button>
+                        </div>
+
+                        <div className="acc-card-v3">
+                          <h3>Gift Codes</h3>
+                          <p className="subtext">Have a code? Claim it to activate features.</p>
+                          <div className="claim-row-v3">
+                            <input type="text" placeholder="Enter code" id="gift-input-acc" />
+                            <button onClick={() => {
+                              const input = document.getElementById('gift-input-acc') as HTMLInputElement;
+                              if (input.value) setShowSubscriptionModal(true); // Re-use gift logic from modal
+                            }}>Claim</button>
+                          </div>
+                        </div>
+
+                        <div className="acc-card-v3">
+                          <h3>Preferences</h3>
+                          <div className="pref-row">
+                             <span>Playback Quality</span>
+                             <b>Always High</b>
+                          </div>
+                          <div className="pref-row">
+                             <span>Restricted Mode</span>
+                             <b>Off</b>
+                          </div>
+                        </div>
+
+                        <div className="acc-actions-footer">
+                          <button onClick={handleLogout} className="logout-btn-v3">Logout</button>
+                        </div>
+                      </div>
+                    </div>
                   )}
+                </div>
+              )}
+
+              {/* ── PLANS SELECTION ── */}
+              {view.name === "plans" && (
+                <div className="plans-selection-view">
+                   <div className="plans-hero">
+                     <img src="/logo.png" alt="" />
+                     <h1>MusicTube Premium</h1>
+                     <p>Pick a plan to start your journey.</p>
+                   </div>
+                   <div className="plans-grid-v3">
+                     <div className="plan-card-v3">
+                        <div className="p-header">Basic</div>
+                        <div className="p-price">₹199<span>/lifetime</span></div>
+                        <ul className="p-list">
+                          <li>Play music & entire features</li>
+                          <li>Core app access</li>
+                          <li>Contains Ads</li>
+                        </ul>
+                        <button className="p-btn" onClick={() => setShowSubscriptionModal(true)}>Get Basic</button>
+                     </div>
+                     <div className="plan-card-v3 pro">
+                        <div className="p-header">Premium Pro</div>
+                        <div className="p-price">₹399<span>/lifetime</span></div>
+                        <ul className="p-list">
+                          <li>No Ads</li>
+                          <li>Background Play</li>
+                          <li>Priority Updates</li>
+                        </ul>
+                        <button className="p-btn pro" onClick={() => setShowSubscriptionModal(true)}>Get Pro</button>
+                     </div>
+                   </div>
+                   <div className="plans-footer">
+                     <button onClick={() => setView({ name: 'home' })} className="skip-link">Maybe Later</button>
+                   </div>
                 </div>
               )}
       

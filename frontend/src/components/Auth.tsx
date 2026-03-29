@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { motion } from 'framer-motion';
+import { Headphones, ShieldCheck, Monitor } from 'lucide-react';
 
 interface AuthProps {
   onLogin: (user: any) => void;
@@ -11,21 +12,18 @@ export function Auth({ onLogin }: AuthProps) {
   const [isFlutterApp, setIsFlutterApp] = useState(false);
 
   useEffect(() => {
-    // Strictly detect if running inside a Flutter WebView or Android WebView
     const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
     const isWebView = 
       /wv/i.test(userAgent) || 
       /flutter/i.test(userAgent) || 
       (window as any).flutter_inappwebview !== undefined ||
-      window.location.port === '8080'; // The Flutter App's Dart server runs on port 8080
+      window.location.port === '8080';
     
     setIsFlutterApp(isWebView);
 
-    // Register globally for the Flutter app to call back
     (window as any).onNativeLoginSuccess = async (nativeUserData: any) => {
       setLoading(true);
       try {
-        // Map native data to our profile schema (sub -> id, picture -> avatar_url)
         const userToSync = {
           id: nativeUserData.id || nativeUserData.sub,
           email: nativeUserData.email,
@@ -33,7 +31,6 @@ export function Auth({ onLogin }: AuthProps) {
           avatar_url: nativeUserData.picture || nativeUserData.avatar_url || '',
         };
 
-        // Sync to profiles
         const { error: upsertError } = await supabase.from('profiles').upsert(userToSync);
         if (upsertError) console.error("Native Profile sync error:", upsertError.message);
 
@@ -41,7 +38,6 @@ export function Auth({ onLogin }: AuthProps) {
         onLogin(userToSync);
       } catch (err) {
         console.error("Flutter App Sync failed:", err);
-        alert('App Authentication failed.');
       } finally {
         setLoading(false);
       }
@@ -52,7 +48,6 @@ export function Auth({ onLogin }: AuthProps) {
     };
   }, [onLogin]);
 
-  // 1. SUPABASE GOOGLE AUTH (For standard Web App)
   const handleSupabaseGoogleLogin = async () => {
     setLoading(true);
     const { error } = await supabase.auth.signInWithOAuth({
@@ -66,61 +61,67 @@ export function Auth({ onLogin }: AuthProps) {
       alert(error.message);
       setLoading(false);
     }
-    // Supabase handles the redirection automatically
   };
 
-
   if (isFlutterApp) {
-    return <div className="google-auth-page" style={{ padding: '40px', color: '#fff' }}>App Auth Removed. Redirecting...</div>;
+    return <div className="app-loader">MusicTube Auth Removed. Syncing...</div>;
   }
 
   return (
-    <div className="google-auth-page">
+    <div className="auth-container-v2">
+      <div className="auth-bg-overlay" />
       <motion.div
-        className="google-auth-card"
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-        style={{ padding: '40px 30px' }}
+        className="auth-card-v2"
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
       >
-        <div className="google-header" style={{ marginBottom: '40px' }}>
-          <div className="google-brand">
-            <img src="/logo.png" alt="MusicTube" style={{ width: '48px', height: '48px', marginRight: '12px' }} />
-            <span style={{ color: '#fff', fontSize: '28px', fontWeight: '800', letterSpacing: '-1px' }}>MusicTube</span>
+        <div className="auth-header-v2">
+          <div className="auth-logo-v2">
+            <img src="/logo.png" alt="MusicTube" className="auth-logo-img" />
+            <h1 className="auth-title-v2">MusicTube</h1>
           </div>
-          <h1 style={{ marginTop: '20px' }}>Sign in</h1>
-          <p>to continue to MusicTube</p>
+          <p className="auth-subtitle-v2">Connect your music universe.</p>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
-          {loading ? (
-            <div className="loader" style={{ margin: '20px 0' }}></div>
-          ) : (
-            <div className="supabase-google-auth" style={{ width: '100%' }}>
-              <button 
-                onClick={handleSupabaseGoogleLogin} 
-                className="google-signin-btn"
-                style={{ background: '#111', color: '#fff', border: '1px solid #333', display: 'flex', justifyContent: 'center', padding: '12px', borderRadius: '24px', width: '300px', margin: '0 auto', fontSize: '15px' }}
-              >
-                <img src="https://lh3.googleusercontent.com/COxitqgJr1sICpeqCu7IFH7I64k3-7B14mRLeuS60B8_8D-0v6S6_08I3vj7U8-p-n0=w300" alt="Google" style={{width: '20px', height: '20px', background: '#fff', borderRadius: '50%', padding: '2px', marginRight: '8px'}} />
+        <div className="auth-content-v2">
+          <button 
+            onClick={handleSupabaseGoogleLogin} 
+            disabled={loading}
+            className="google-btn-premium"
+          >
+            {loading ? (
+              <div className="mini-loader" />
+            ) : (
+              <>
+                <img src="https://lh3.googleusercontent.com/COxitqgJr1sICpeqCu7IFH7I64k3-7B14mRLeuS60B8_8D-0v6S6_08I3vj7U8-p-n0=w300" alt="Google" className="google-icon-v2" />
                 Sign in with Google
-              </button>
+              </>
+            )}
+          </button>
+          
+          <div className="auth-benefits-v2">
+            <div className="benefit-item-v2">
+              <Headphones size={20} className="benefit-icon-v2" />
+              <span>Listen and discover music you love.</span>
             </div>
-          )}
+            <div className="benefit-item-v2">
+              <ShieldCheck size={20} className="benefit-icon-v2" />
+              <span>Safe and secure authentication.</span>
+            </div>
+            <div className="benefit-item-v2">
+              <Monitor size={20} className="benefit-icon-v2" />
+              <span>Sync across all your devices.</span>
+            </div>
+          </div>
         </div>
 
-        <div className="auth-divider" style={{ margin: '40px 0 20px' }}>
-          <span>Secure authentication</span>
+        <div className="auth-footer-v2">
+          <p>By signing in, you agree to our Terms and Conditions.</p>
+          <div className="secure-badge-v2">
+             <ShieldCheck size={12} /> Secure Account
+          </div>
         </div>
-
-        <p style={{ fontSize: '12px', color: '#5f6368', textAlign: 'center', lineHeight: '1.6' }}>
-          By signing in, you agree to the Terms of Service. Your account information will be stored securely.
-        </p>
-        
-        {/* Helper debug text to verify platform logic */}
-        <p style={{ fontSize: '10px', color: '#ccc', textAlign: 'center', marginTop: '20px' }}>
-          Running Mode: Browser Web App
-        </p>
       </motion.div>
     </div>
   );

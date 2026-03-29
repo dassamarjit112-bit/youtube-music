@@ -15,8 +15,15 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ user, isOp
   const [giftCode, setGiftCode] = useState('');
   const [giftError, setGiftError] = useState('');
 
-  const handleRazorpay = async (plan: string, amount: number) => {
+  const handleRazorpay = async (plan: string, originalAmount: number) => {
     setLoading(true);
+    let amount = originalAmount;
+
+    // UPGRADE LOGIC: Cut basic amount if already subscribed
+    if (user?.subscription_tier === 'basic' && plan === 'Premium') {
+      amount = originalAmount - 199; // Difference (399 - 199 = 200)
+    }
+
     const keyId = import.meta.env.VITE_RAZORPAY_KEY_ID;
     if (!keyId || keyId.includes('PLACEHOLDER')) {
       alert("Razorpay Key ID is not configured in .env file.");
@@ -179,7 +186,9 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ user, isOp
                 onClick={() => handleRazorpay('Premium', 399)}
                 className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold hover:opacity-90 transition-all disabled:opacity-50"
               >
-                {user?.subscription_tier === 'premium' ? 'Current Tier' : 'Go Premium'}
+                {user?.subscription_tier === 'premium' 
+                  ? 'Current Tier' 
+                  : (user?.subscription_tier === 'basic' ? 'Upgrade for ₹200' : 'Go Premium')}
               </button>
             </div>
           </div>

@@ -1,9 +1,13 @@
-const isLocal = window.location.hostname === "localhost" || window.location.hostname.match(/^\d+\.\d+\.\d+\.\d+$/);
-const isFlutter = window.location.port === "8080";
+// PRODUCTION API URL (Set this in your Vercel/Netlify Environment Variables)
+const PROD_API = import.meta.env.VITE_API_BASE_URL || "https://your-backend-on-render.com/api"; 
 
-// For the APK (Flutter), we use the production API exclusively 
-// because port 5000 on a phone refers to the phone itself, not the PC.
-const BASE = (isFlutter && isLocal) ? "/api" : (isLocal ? `http://${window.location.hostname}:5000/api` : "/api");
+// Detect if running inside Flutter WebView or local development
+const isLocal = window.location.hostname === "localhost" || window.location.hostname.match(/^127\./) || window.location.hostname.match(/^192\./);
+const isFlutter = /wv|flutter/i.test(navigator.userAgent) || window.location.port === "8080";
+
+// For the Flutter App (APK), we MUST use a Public IP or Cloud URL
+// If running without PC, set "VITE_API_BASE_URL" in your build.
+const BASE = isLocal ? (isFlutter ? "http://192.168.1.3:5000/api" : `http://${window.location.hostname}:5000/api`) : PROD_API;
 
 export interface Song {
   type: "song" | "video";
