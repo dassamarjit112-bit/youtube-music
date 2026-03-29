@@ -291,49 +291,58 @@ function App() {
     }
 
     // Fallback: check Supabase session (e.g. after OAuth redirect or page refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
-        // First sync/fetch user record
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
-
-        const u = {
+        // FAST PATH: Instantly build optimistic user from session for zero-delay UI rendering
+        const cachedUserStr = localStorage.getItem('ytm_user');
+        const cachedUser = cachedUserStr ? JSON.parse(cachedUserStr) : null;
+        
+        const fastUser = {
           id: session.user.id,
           email: session.user.email,
-          full_name: profile?.full_name ?? session.user.user_metadata?.full_name ?? session.user.email?.split('@')[0] ?? '',
-          avatar_url: profile?.avatar_url ?? session.user.user_metadata?.avatar_url ?? '',
-          subscription_tier: profile?.subscription_tier ?? 'free'
+          full_name: session.user.user_metadata?.full_name ?? session.user.email?.split('@')[0] ?? 'User',
+          avatar_url: session.user.user_metadata?.avatar_url ?? '',
+          subscription_tier: cachedUser?.subscription_tier ?? 'free',
+          isGuest: false
         };
+
+        // Immediately update UI to prevent generic browser lockup!
+        setUser(fastUser);
+        localStorage.setItem('ytm_user', JSON.stringify(fastUser));
         
-        // Fix: Automatically sync metadata to Profiles table (don't overwrite subscription_tier if it exists)
-        try {
-          await supabase.from('profiles').upsert({
-            id: u.id,
-            email: u.email,
-            full_name: u.full_name,
-            avatar_url: u.avatar_url,
-            // subscription_tier is handled separately in DB usually
-          }, { onConflict: 'id' });
-          console.log("🔥 Profile Synced:", u.full_name, "| Tier:", u.subscription_tier);
-        } catch (e) {
-          console.warn("Profile sync delay:", e);
+        // Handle post-login redirection fast!
+        if (_event === 'SIGNED_IN') {
+           setView(fastUser.subscription_tier === 'free' ? { name: 'plans' } : { name: 'home' });
         }
 
-        localStorage.setItem('ytm_user', JSON.stringify(u));
-        setUser(u);
-        
-        // Flow: After login, if free or no plan, go to plans. Else home.
-        if (!u.subscription_tier || u.subscription_tier === 'free') {
-          setView({ name: 'plans' });
-        } else {
-          setView({ name: 'home' });
-        }
+        fetchFavorites(fastUser.id);
+        fetchHistory(fastUser.id);
 
-        fetchFavorites(u.id);
-        fetchHistory(u.id);
+        // BACKGROUND SYNC: Extract Supabase Details to update Profile in background
+        supabase
+          .from('profiles')
+          .select('subscription_tier, full_name, avatar_url')
+          .eq('id', session.user.id)
+          .single()
+          .then(({ data: profile }) => {
+            const finalUser = {
+              ...fastUser,
+              full_name: profile?.full_name || fastUser.full_name,
+              avatar_url: profile?.avatar_url || fastUser.avatar_url,
+              subscription_tier: profile?.subscription_tier || 'free'
+            };
+            setUser(finalUser);
+            localStorage.setItem('ytm_user', JSON.stringify(finalUser));
+
+            // Safely Upsert missing details
+            supabase.from('profiles').upsert({
+              id: finalUser.id,
+              email: finalUser.email,
+              full_name: finalUser.full_name,
+              avatar_url: finalUser.avatar_url
+            }, { onConflict: 'id' }).then(() => console.log("🔥 Profile Synced In Background"));
+          });
+          
       } else if (_event === 'SIGNED_OUT') {
         setUser(GUEST_USER);
         localStorage.removeItem('ytm_user');
@@ -736,12 +745,17 @@ function App() {
   // Removed strict login wall to allow Guest browsing
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    localStorage.removeItem("ytm_user");
-    setUser(GUEST_USER);
-    setCurrentSong(null);
-    setQueue([]);
-    setView({ name: 'account' });
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.warn("Supabase signout sync failed, forcing local scrub.", e);
+    } finally {
+      localStorage.removeItem("ytm_user");
+      setUser(GUEST_USER);
+      setCurrentSong(null);
+      setQueue([]);
+      setView({ name: 'account' });
+    }
   };
 
   // ─── Web Media Session (Background Controls) ───
