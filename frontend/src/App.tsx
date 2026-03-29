@@ -131,10 +131,8 @@ function App() {
         } else {
           setView({ name: 'home' });
         }
-        // Only force plans page if user has never chosen a tier AND we explicitly need it
-        if (!u.subscription_tier) {
-          // Don't block, just show home - plans are optional
-          setView({ name: 'home' });
+        if (!u.subscription_tier && !u.isGuest) {
+          setView({ name: 'plans' });
         }
       } else {
         setView({ name: 'home' });
@@ -282,11 +280,10 @@ function App() {
 
   // App Session Listener
   useEffect(() => {
-    // If already loaded from localStorage, just fetch dependent data
-    if (user?.id) {
+    // If already loaded from localStorage, fetch dependent data (for non-guest)
+    if (user?.id && !user.isGuest) {
       fetchFavorites(user.id);
       fetchHistory(user.id);
-      return;
     }
 
     // Fallback: check Supabase session (e.g. after OAuth redirect or page refresh)
@@ -324,10 +321,9 @@ function App() {
         localStorage.setItem('ytm_user', JSON.stringify(u));
         setUser(u);
         
-        // Flow: After login, if no plan, go to plans. Else home.
-        if (!u.subscription_tier) {
+        // Flow: After login, if free or no plan, go to plans. Else home.
+        if (!u.subscription_tier || u.subscription_tier === 'free') {
           setView({ name: 'plans' });
-          setShowSubscriptionModal(true);
         } else {
           setView({ name: 'home' });
         }
@@ -335,7 +331,7 @@ function App() {
         fetchFavorites(u.id);
         fetchHistory(u.id);
       } else if (_event === 'SIGNED_OUT') {
-        setUser(null);
+        setUser(GUEST_USER);
         localStorage.removeItem('ytm_user');
         setView({ name: 'account' });
       }
@@ -1543,6 +1539,17 @@ function App() {
                    <div className="plans-footer">
                      <button onClick={() => setView({ name: 'home' })} className="skip-link">Maybe Later</button>
                    </div>
+                </div>
+              )}
+
+              {/* ── ACCOUNT / LOGIN ── */}
+              {view.name === "account" && (
+                <div className="account-view">
+                  <Auth onLogin={(u: any) => { 
+                    setUser(u);
+                    const hasPlan = u.subscription_tier && u.subscription_tier !== 'free';
+                    setView({ name: hasPlan ? 'home' : 'plans' });
+                  }} />
                 </div>
               )}
       {/* ── PLAYER ── */}
