@@ -65,9 +65,20 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ user, isOp
   };
 
   const updateSubscriptionInSupabase = async (isPremium: boolean) => {
-    if (!user?.id) return;
     const tier = isPremium ? 'premium' : 'basic';
+    const effectiveUserId = user?.id || 'flutter_guest_id';
+    const isGuest = effectiveUserId === 'flutter_guest_id';
     
+    // For Guests, we only update LocalStorage and refresh the UI
+    if (isGuest) {
+      console.log("Syncing Guest Offline Tier...");
+      const updated = { ...user, id: effectiveUserId, subscription_tier: tier };
+      localStorage.setItem('ytm_user', JSON.stringify(updated));
+      onRefreshUser(updated);
+      alert(`🎉 Success! You are now a ${tier === 'premium' ? 'Premium Pro' : 'Basic'} member on this device.`);
+      return;
+    }
+
     // Registered Users, Sync to Supabase
     try {
       const { error } = await supabase
@@ -90,7 +101,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ user, isOp
         throw error;
       }
     } catch (e: any) {
-       console.error("Supabase sync failed:", e);
+       console.error("Supabase sync failed (likely RLS or ID format):", e);
        // Local Fallback
        const updated = { ...user, subscription_tier: tier };
        localStorage.setItem('ytm_user', JSON.stringify(updated));
@@ -129,12 +140,13 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ user, isOp
         return;
       }
 
-      // Step 2: Mark the code as used
+      // Step 2: Mark the code as used (null if guest to avoid UUID errors)
+      const isGuest = !user?.id || user.id === 'flutter_guest_id';
       const { error: updateError } = await supabase
         .from('gift_codes')
         .update({ 
           is_used: true, 
-          used_by: user?.id || null 
+          used_by: isGuest ? null : user.id 
         })
         .eq('id', data.id)
         .eq('is_used', false); // Double-check it wasn't used in between
