@@ -187,6 +187,9 @@ function App() {
   const queueRef = useRef(queue);
   queueRef.current = queue;
 
+  // Ref so onEnded always sees the latest handleNext (fixes stale-closure autoplay bug)
+  const handleNextRef = useRef<() => void>(() => {});
+
   const ytPlayer = useYouTubePlayer("yt-player-container", {
     onStateChange: (state) => {
       // YT.PlayerState: -1=unstarted, 0=ended, 1=playing, 2=paused, 3=buffering, 5=cued
@@ -198,7 +201,7 @@ function App() {
       setPlayedSeconds(secs);
     },
     onDuration: (d) => setDuration(d),
-    onEnded: () => handleNext(),
+    onEnded: () => handleNextRef.current(),
     onError: (code) => {
       console.error("YouTube player error code:", code);
       const msg =
@@ -610,6 +613,9 @@ function App() {
     setCurrentSong(q[nextIdx]);
   };
 
+  // Always keep the ref pointing at the latest handleNext
+  handleNextRef.current = handleNext;
+
   const handlePrev = () => {
     if (playedSeconds > 3) {
       ytPlayer.seekTo(0);
@@ -627,16 +633,16 @@ function App() {
   const playSong = async (song: Song, songList?: Song[]) => {
     if (!song.videoId) return;
 
-    // MANDATORY: User must be logged in and have a plan to play
-    if (!user) {
+    // Must be logged in (not a guest) to play
+    if (!user || user.isGuest) {
       setView({ name: 'account' });
       return;
     }
     
     const isSubscribed = user?.subscription_tier === 'basic' || user?.subscription_tier === 'premium';
     if (!isSubscribed) {
-      setView({ name: 'plans' });
       setShowSubscriptionModal(true);
+      setView({ name: 'plans' });
       return;
     }
 
@@ -731,8 +737,10 @@ function App() {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     localStorage.removeItem("ytm_user");
-    setUser(null);
-    setView({ name: "home" });
+    setUser(GUEST_USER);
+    setCurrentSong(null);
+    setQueue([]);
+    setView({ name: 'account' });
   };
 
   // ─── Web Media Session (Background Controls) ───

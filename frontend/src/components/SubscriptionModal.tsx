@@ -62,15 +62,16 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ user, isOp
   const updateSubscriptionInSupabase = async (isPremium: boolean) => {
     if (!user?.id) return;
     const tier = isPremium ? 'premium' : 'basic';
-    const isGuest = user.id === 'flutter_guest_id';
+    // Use isGuest flag (consistent with App.tsx GUEST_USER)
+    const isGuestUser = user.isGuest === true;
     
     // For Guests, we only update LocalStorage and refresh the UI
-    if (isGuest) {
+    if (isGuestUser) {
       console.log("Syncing Guest Offline Tier...");
-      const updated = { ...user, subscription_tier: tier };
+      const updated = { ...user, subscription_tier: tier, isGuest: false };
       localStorage.setItem('ytm_user', JSON.stringify(updated));
       onRefreshUser(updated);
-      alert(`🎉 Success! You are now a ${tier.toUpperCase()} member on this device.`);
+      alert(`🎉 Success! You are now a ${tier === 'premium' ? 'Premium Pro' : 'Basic'} member on this device!`);
       return;
     }
 
@@ -91,17 +92,17 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ user, isOp
         const updated = { ...user, subscription_tier: tier };
         localStorage.setItem('ytm_user', JSON.stringify(updated));
         onRefreshUser(updated);
-        alert(`🎉 Success! You are now a ${tier.toUpperCase()} member.`);
+        alert(`🎉 Success! You are now a ${tier === 'premium' ? 'Premium Pro' : 'Basic'} member!`);
       } else {
         throw error;
       }
     } catch (e: any) {
-       console.error("Supabase sync failed (likely RLS or ID format):", e);
-       // We still update local status so the user can use the app they just paid for!
+       console.error("Supabase sync failed:", e);
+       // Update local status so the user can use what they paid for immediately
        const updated = { ...user, subscription_tier: tier };
        localStorage.setItem('ytm_user', JSON.stringify(updated));
        onRefreshUser(updated);
-       alert("🎉 Payment Success! Your features are unlocked. (Sync saved locally)");
+       alert(`🎉 ${tier === 'premium' ? 'Premium Pro' : 'Basic'} activated! (Synced locally)`);
     }
   };
 
