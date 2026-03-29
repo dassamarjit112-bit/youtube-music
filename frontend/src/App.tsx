@@ -1548,7 +1548,7 @@ function App() {
                   <Auth onLogin={(u: any) => { 
                     setUser(u);
                     const hasPlan = u.subscription_tier && u.subscription_tier !== 'free';
-                    setView({ name: hasPlan ? 'home' : 'plans' });
+                    setView(hasPlan ? { name: 'home' } : { name: 'plans' });
                   }} />
                 </div>
               )}
