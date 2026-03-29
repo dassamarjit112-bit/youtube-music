@@ -81,6 +81,7 @@ function App() {
   const isPremium = user?.subscription_tier === 'premium';
   const [isShuffle, setIsShuffle] = useState(false);
   const [repeatMode, setRepeatMode] = useState<'none' | 'all' | 'one'>('none');
+  const [autoPlay, setAutoPlay] = useState(true);
 
   useEffect(() => {
     const hOnline = () => setIsOffline(false);
@@ -479,6 +480,33 @@ function App() {
     }
   };
 
+  const triggerAutoPlayExtension = async (lastSong: Song) => {
+    try {
+      const res = await api.watch(lastSong.videoId);
+      if (res.tracks && res.tracks.length > 0) {
+        const nextBatch = res.tracks.slice(1, 40);
+        setQueue(prevQueue => {
+          const uBatch = nextBatch.filter(s => !prevQueue.find(sq => sq.videoId === s.videoId));
+          const newQueue = [...prevQueue, ...uBatch];
+          // After adding new songs, if we were at the end, immediately play the next one
+          if (newQueue.length > prevQueue.length) {
+            setTimeout(() => {
+              const q = queueRef.current;
+              const currentIdx = q.findIndex(s => s.videoId === currentSongRef.current?.videoId);
+              if (currentIdx !== -1 && currentIdx < q.length - 1) {
+                setCurrentSong(q[currentIdx + 1]);
+              }
+            }, 300);
+          }
+          return newQueue;
+        });
+      }
+    } catch (e) {
+      console.error("Auto-play extension failed:", e);
+      setIsPlaying(false);
+    }
+  };
+
   const handleNext = async () => {
     const q = queueRef.current;
     if (q.length === 0) return;
@@ -500,6 +528,15 @@ function App() {
     } else if (nextIdx >= q.length) {
       if (repeatMode === 'all') {
         nextIdx = 0;
+      } else if (autoPlay) {
+        // If autoPlay is on and we reached the end, stay on the current song 
+        // until the AI extension logic (below) adds more songs.
+        // We trigger handleNext again after a short delay if songs were added.
+        const lastSong = q[q.length - 1] || currentSongRef.current;
+        if (lastSong) {
+          triggerAutoPlayExtension(lastSong);
+        }
+        return;
       } else {
         setIsPlaying(false);
         return;
@@ -507,7 +544,7 @@ function App() {
     }
     
     // Proactive AI Radio Extension
-    if (nextIdx >= q.length - 3) {
+    if (autoPlay && nextIdx >= q.length - 3) {
       const lastSong = q[nextIdx] || currentSongRef.current;
       if (lastSong) {
         try {
@@ -1305,7 +1342,22 @@ function App() {
                                   {s.videoId === currentSong.videoId && <div className="q-playing-icon"><Music2 size={16} /></div>}
                                </div>
                             ))}
-                         </div>
+                             
+                             {autoPlay && (
+                               <div className="auto-play-indicator">
+                                 <div className="ap-header">
+                                   <span>Autoplay is on</span>
+                                   <button 
+                                     className={`ap-toggle ${autoPlay ? 'active' : ''}`}
+                                     onClick={() => setAutoPlay(!autoPlay)}
+                                   >
+                                     <div className="ap-dot" />
+                                   </button>
+                                 </div>
+                                 <p className="ap-desc">Similar songs will play automatically</p>
+                               </div>
+                             )}
+                          </div>
                       </div>
                    </div>
 
@@ -1591,6 +1643,39 @@ function App() {
         </div>
       </footer>
       )}
+
+      {/* ── Mobile Bottom Navigation ── */}
+      <nav className="mobile-bottom-nav">
+        <button 
+          className={view.name === "home" ? "active" : ""} 
+          onClick={() => navigateTo({ name: "home" })}
+        >
+          <Home size={24} />
+          <span>Home</span>
+        </button>
+        <button 
+          className={view.name === "explore" ? "active" : ""} 
+          onClick={() => navigateTo({ name: "explore" })}
+        >
+          <Compass size={24} />
+          <span>Explore</span>
+        </button>
+        <button 
+          className={view.name === "library" ? "active" : ""} 
+          onClick={() => isLoggedIn ? navigateTo({ name: "library" }) : setView({ name: 'account' })}
+        >
+          <Library size={24} />
+          <span>Library</span>
+        </button>
+        <button 
+          className={view.name === "player" ? "active" : ""} 
+          onClick={() => currentSong && setView({ name: "player" })}
+          disabled={!currentSong}
+        >
+          <Play size={24} />
+          <span>Now Play</span>
+        </button>
+      </nav>
 
       {/* ── Hidden YouTube IFrame Container ── */}
       <div className="yt-engine">

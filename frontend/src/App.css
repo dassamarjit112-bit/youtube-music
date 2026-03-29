@@ -1899,8 +1899,8 @@ body {
   }
 
   /* Floating Bottom Navigation Pill */
-  .bottom-nav {
-    position: center;
+  .mobile-bottom-nav {
+    position: fixed;
     bottom: 24px;
     left: 50%;
     transform: translateX(-50%);
@@ -1908,7 +1908,7 @@ body {
     min-width: 85%;
     max-width: 90%;
     height: 64px;
-    background: rgba(18, 18, 18, 0.85);
+    background: rgba(18, 18, 18, 0.9);
     backdrop-filter: blur(24px) saturate(180%);
     border-radius: 32px;
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -1920,7 +1920,7 @@ body {
     padding: 0 12px;
   }
 
-  .bottom-nav button {
+  .mobile-bottom-nav button {
     background: none;
     border: none;
     color: rgba(255, 255, 255, 0.5);
@@ -1932,14 +1932,21 @@ body {
     padding: 0 12px;
     height: 100%;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    font-size: 10px;
+    font-weight: 500;
   }
 
-  .bottom-nav button.active {
+  .mobile-bottom-nav button.active {
     color: #fff;
-    transform: scale(1.1);
+    transform: translateY(-2px);
+  }
+  
+  .mobile-bottom-nav button:disabled {
+    opacity: 0.3;
+    pointer-events: none;
   }
 
-  .bottom-nav button svg {
+  .mobile-bottom-nav button svg {
     margin-bottom: 2px;
   }
 
@@ -2393,6 +2400,62 @@ body {
     border-radius: 12px;
     margin-top: 12px;
     border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  /* Auto Play Styles */
+  .auto-play-indicator {
+    margin: 24px 0 12px;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  
+  .ap-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+  
+  .ap-header span {
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+  }
+  
+  .ap-toggle {
+    width: 40px;
+    height: 20px;
+    background: #444;
+    border-radius: 10px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.3s;
+  }
+  
+  .ap-toggle.active {
+    background: #f00;
+  }
+  
+  .ap-dot {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.3s;
+  }
+  
+  .ap-toggle.active .ap-dot {
+    transform: translateX(20px);
+  }
+  
+  .ap-desc {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.5);
   }
 
   .sub-card .badge {
