@@ -1374,9 +1374,11 @@ function App() {
                    <div className="player-bg-blur" style={{ backgroundImage: `url(${currentSong.thumbnail})` }} />
                    <div className="player-content-grid">
                       <div className="player-left">
-                         <button className="back-btn-v3" onClick={() => setView({ name: 'home' })}>
-                           <ArrowLeft size={24} />
-                         </button>
+                         <div className="player-back-zone">
+                            <button className="back-btn-v4" onClick={() => setView({ name: 'home' })}>
+                              <ArrowLeft size={24} /> <span>Home</span>
+                            </button>
+                          </div>
                           <div className="player-art-container" onClick={() => setShowFloatingControls(!showFloatingControls)}>
                             <img src={currentSong.thumbnail} className="player-art-v3" alt="" />
                             <AnimatePresence>
@@ -1449,21 +1451,23 @@ function App() {
                       </div>
                    </div>
 
-                   {/* Fixed Bottom Controls for Player View */}
-                   <div className="player-controls-v3">
-                      <div className="prog-container">
-                        <span className="time">{formatTime(playedSeconds)}</span>
-                        <input type="range" min={0} max={0.9999} step="any" value={played} onChange={handleSeek} />
-                        <span className="time">{formatTime(duration)}</span>
+                    {/* Floating Bottom Controls for Player View */}
+                    <div className="player-floating-bottom">
+                      <div className="player-controls-pill">
+                         <div className="prog-container-v4">
+                           <span className="time">{formatTime(playedSeconds)}</span>
+                           <input type="range" min={0} max={0.9999} step="any" value={played} onChange={handleSeek} />
+                           <span className="time">{formatTime(duration)}</span>
+                         </div>
+                         <div className="ctrl-btns-v4">
+                            <button onClick={handlePrev} className="ctrl-side-btn"><SkipBack size={28} fill="currentColor" /></button>
+                            <button className="play-pill-btn" onClick={() => setIsPlaying(!isPlaying)}>
+                               {isPlaying ? <Pause size={32} fill="currentColor" /> : <Play size={32} fill="currentColor" style={{ marginLeft: 4 }} />}
+                            </button>
+                            <button onClick={handleNext} className="ctrl-side-btn"><SkipForward size={28} fill="currentColor" /></button>
+                         </div>
                       </div>
-                      <div className="ctrl-btns-v3">
-                         <button onClick={handlePrev}><SkipBack size={32} fill="currentColor" /></button>
-                         <button className="play-circle" onClick={() => setIsPlaying(!isPlaying)}>
-                            {isPlaying ? <Pause size={48} fill="currentColor" /> : <Play size={48} fill="currentColor" style={{ marginLeft: 6 }} />}
-                         </button>
-                         <button onClick={handleNext}><SkipForward size={32} fill="currentColor" /></button>
-                      </div>
-                   </div>
+                    </div>
                 </div>
               )}
       
