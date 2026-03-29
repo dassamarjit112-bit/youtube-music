@@ -1504,6 +1504,8 @@ body {
   }
   .menu-item:hover { background: rgba(255,255,255,0.05); }
   .menu-item.premium { background: rgba(255,0,0,0.1); border: 1px solid rgba(255,0,0,0.2); }
+  .menu-item.premium-active { background: rgba(76, 175, 80, 0.1); border: 1px solid rgba(76, 175, 80, 0.2); }
+  .menu-item.premium-active h3 { color: #4caf50; }
   .menu-item .icon { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; }
   .menu-item .txt h3 { font-size: 16px; margin-bottom: 2px; }
   .menu-item .txt p { font-size: 12px; opacity: 0.6; }

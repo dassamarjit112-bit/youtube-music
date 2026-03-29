@@ -28,9 +28,10 @@ function App() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
+  const isWebView = /wv/i.test(navigator.userAgent) || /flutter/i.test(navigator.userAgent) || window.location.port === '8080';
+
   const [user, setUser] = useState<any>(() => {
     try {
-      const isWebView = /wv/i.test(navigator.userAgent) || /flutter/i.test(navigator.userAgent) || window.location.port === '8080';
       if (isWebView) {
         return {
           id: 'flutter_guest_id',
@@ -224,7 +225,6 @@ function App() {
 
   // App Session Listener
   useEffect(() => {
-    const isWebView = /wv/i.test(navigator.userAgent) || /flutter/i.test(navigator.userAgent) || window.location.port === '8080';
     if (isWebView) {
       if (user?.id) {
         fetchFavorites(user.id);
@@ -414,6 +414,7 @@ function App() {
   };
 
   const fetchPlaylist = async (id: string) => {
+    if (id.startsWith('local_')) return;
     setIsLoading(true);
     setAlbumData(null); // Reuse albumData or add playlistData state
     try {
@@ -1152,13 +1153,23 @@ function App() {
                       
                       <div className="account-menu">
                         <div className="menu-group">
-                          <div className="menu-item premium" onClick={() => {}}>
-                            <div className="icon"><Play size={20} fill="#f00" /></div>
-                            <div className="txt">
-                              <h3>Get Music Premium</h3>
-                              <p>Try it free for 1 month</p>
+                          {isWebView ? (
+                            <div className="menu-item premium-active">
+                              <div className="icon"><Play size={20} fill="#4caf50" color="#4caf50" /></div>
+                              <div className="txt">
+                                <h3>Music Premium</h3>
+                                <p>Subscription Active</p>
+                              </div>
                             </div>
-                          </div>
+                          ) : (
+                            <div className="menu-item premium" onClick={() => {}}>
+                              <div className="icon"><Play size={20} fill="#f00" /></div>
+                              <div className="txt">
+                                <h3>Get Music Premium</h3>
+                                <p>Try it free for 1 month</p>
+                              </div>
+                            </div>
+                          )}
                         </div>
 
                         <div className="menu-group">
