@@ -255,23 +255,33 @@ function App() {
 
   const triggerAutoPlayExtension = async (lastSong: Song) => {
     try {
+      // 1. Fetch initial related tracks
       const res = await api.watch(lastSong.videoId);
-      if (res.tracks && res.tracks.length > 0) {
-        // Filter out songs already in the queue to prevent loops
-        const currentIds = new Set(queueRef.current.map(s => s.videoId));
-        const filteredTracks = res.tracks.filter(t => !currentIds.has(t.videoId));
+      let tracks = res.tracks || [];
 
-        const nextBatch = filteredTracks.slice(0, 20); // Get a fresh batch of 20
+      // 2. Filter out already queued to avoid infinite loops
+      const currentIds = new Set(queueRef.current.map(s => s.videoId));
+      let filteredTracks = tracks.filter(t => !currentIds.has(t.videoId));
 
-        setQueue(prev => [...prev, ...nextBatch]);
+      // 3. If we don't have enough (40+), fetch recommendations for the FIRST related track too!
+      // This deepens the vibe search (recursive-style extension)
+      if (filteredTracks.length < 40 && tracks.length > 0) {
+        const secondaryRes = await api.watch(tracks[0].videoId);
+        const secondaryTracks = secondaryRes.tracks || [];
+        const secondaryFiltered = secondaryTracks.filter(t => !currentIds.has(t.videoId) && !tracks.some(tr => tr.videoId === t.videoId));
+        filteredTracks = [...filteredTracks, ...secondaryFiltered];
+      }
 
-        // If the player was actually stopped because it hit the end, start it now
-        if (!isPlayingRef.current) {
-          const firstNewSong = nextBatch[0];
-          if (firstNewSong) {
-            setCurrentSong(firstNewSong);
-            setIsPlaying(true);
-          }
+      const nextBatch = filteredTracks.slice(0, 50); // Get up to 50 for a solid queue
+
+      setQueue(prev => [...prev, ...nextBatch]);
+
+      // 4. Start playback if stopped
+      if (!isPlayingRef.current) {
+        const firstNewSong = nextBatch[0];
+        if (firstNewSong) {
+          setCurrentSong(firstNewSong);
+          setIsPlaying(true);
         }
       }
     } catch (e) {
@@ -287,19 +297,19 @@ function App() {
       return;
     }
 
-    console.log("▶ Playing:", song.title, "| videoId:", song.videoId);
-
-    // Set immediate song to start playback
     if (isOffline && !downloads.some(d => d.videoId === song.videoId)) {
       setPlayerError("You are offline. Only downloaded songs can be played.");
       setTimeout(() => setPlayerError(null), 3000);
       return;
     }
 
+    console.log("▶ Playing:", song.title, "| videoId:", song.videoId);
+
     if (song.videoId === currentSongRef.current?.videoId) {
       ytPlayer.seekTo(0);
       ytPlayer.play();
     }
+
     setCurrentSong(song);
     setIsPlaying(true);
     setPlayed(0);
@@ -307,15 +317,21 @@ function App() {
     setDuration(0);
     logHistory(song);
 
-    // Initialize/Restart Silent Audio on User Interaction (CRITICAL FOR BACKGROUND PLAY)
+    // ─── Initialize/Restart Silent Audio (CRITICAL FOR BACKGROUND PLAY) ───
     if (!silentRef.current) {
       silentRef.current = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFav7//v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+');
       silentRef.current.loop = true;
     }
     silentRef.current.play().catch(() => { });
 
-    if (songList && songList.length > 0) {
+    // ─── Auto-populate Vibe-Matched Queue ───
+    if (!songList || songList.length < 5) {
+      triggerAutoPlayExtension(song);
+    } else {
       setQueue(songList);
+      if (songList.length < 20) {
+        triggerAutoPlayExtension(songList[songList.length - 1]);
+      }
     }
   };
 
@@ -751,7 +767,16 @@ function App() {
       setDownloads(d => d.filter(s => s.videoId !== song.videoId));
     } else {
       setDownloads(d => [...d, song]);
+      // Trigger a real file download too!
+      downloadFile(song);
     }
+  };
+
+  const downloadFile = (song: Song) => {
+    // Premium Download Logic: Use an optimized MP3 download service
+    // This allows real file saving to mobile or desktop storage
+    const downloadUrl = `https://api.vevioz.com/@download/mp3/${song.videoId}`;
+    window.open(downloadUrl, '_blank');
   };
 
   const fetchExplore = async () => {
@@ -913,18 +938,36 @@ function App() {
 
   const handleLogout = async () => {
     try {
-      await supabase.auth.signOut();
+      // 1. Explicitly sign out with local scope to wipe session from browser storage
+      await supabase.auth.signOut({ scope: 'local' });
     } catch (e) {
       console.warn("Supabase signout sync failed, forcing local scrub.", e);
     } finally {
-      localStorage.removeItem("ytm_user");
+      // 2. Comprehensive scrub of all known storage keys
+      const keysToClear = [
+        'ytm_user', 'ytm_favorites', 'ytm_downloads', 'ytm_playlists', 
+        'ytm_currentSong', 'ytm_queue', 'ytm_view'
+      ];
+      keysToClear.forEach(k => localStorage.removeItem(k));
+      
+      // 3. Clear ANY Supabase-prefixed keys that might linger
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('sb-') || key.includes('supabase'))) {
+          localStorage.removeItem(key);
+        }
+      }
+
+      // 4. Force state reset
       setUser(GUEST_USER);
       setIsPlaying(false);
       try { ytPlayer?.pause(); } catch (err) {}
       try { silentRef.current?.pause(); } catch (err) {}
       setCurrentSong(null);
       setQueue([]);
-      setView({ name: 'account' });
+      
+      // 5. Hard reload to ensure all memory states and Supabase instances are nuked
+      window.location.href = window.location.origin;
     }
   };
 
@@ -1404,7 +1447,10 @@ function App() {
                           {favorites.some(f => f.videoId === activeMenuSong.videoId) ? 'Remove from Liked' : 'Like'}
                         </button>
                         <button onClick={() => { toggleDownload(activeMenuSong); setActiveMenuSong(null); }}>
-                          <PlusCircle size={20} /> {downloads.some(d => d.videoId === activeMenuSong.videoId) ? 'Remove Download' : 'Download'}
+                          <PlusCircle size={20} /> {downloads.some(d => d.videoId === activeMenuSong.videoId) ? 'Remove from Downloads' : 'Save to Downloads'}
+                        </button>
+                        <button onClick={() => { downloadFile(activeMenuSong); setActiveMenuSong(null); }}>
+                          <Download size={20} /> Download MP3 to Storage
                         </button>
                         <div className="submenu-section">
                           <p>Add to Playlist</p>
