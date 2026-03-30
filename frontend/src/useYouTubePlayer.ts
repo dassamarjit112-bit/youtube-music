@@ -178,12 +178,8 @@ export function useYouTubePlayer(
   }, []);
 
   // Stable API object
-  return { 
-    load, 
-    cue,      // Make sure 'cue' is included here
-    play, 
-    pause, 
-    seekTo, 
-    setVolume, 
-    player: playerRef.current 
-  };
+  return useMemo(() => ({
+    load, cue, play, pause, seekTo, setVolume, player: playerRef.current
+  }), [load, cue, play, pause, seekTo, setVolume, playerRef.current]);
+}
+
