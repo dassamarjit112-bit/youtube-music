@@ -37,14 +37,8 @@ function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
 
-  const [user, setUser] = useState<any>(() => {
-    try {
-      const saved = localStorage.getItem('ytm_user');
-      return saved ? JSON.parse(saved) : GUEST_USER;
-    } catch {
-      return GUEST_USER;
-    }
-  });
+  const [user, setUser] = useState<any>(GUEST_USER);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -97,24 +91,34 @@ function App() {
   }, []);
   useEffect(() => {
     const hydrate = async () => {
-
       try {
-        // Hydration now relies on Supabase Sync
-        
         // ── SYNC WITH SUPABASE (THE ONLY SOURCE OF TRUTH) ──
         const { data: { session } } = await supabase.auth.getSession();
         
         if (session?.user) {
+          // Check local cache first for instant UI
+          const cachedUserStr = localStorage.getItem('ytm_user');
+          if (cachedUserStr) {
+            const cachedUser = JSON.parse(cachedUserStr);
+            if (cachedUser.id === session.user.id) {
+               setUser(cachedUser);
+               if (cachedUser.subscription_tier !== 'free') setView({ name: 'home' });
+               else setView({ name: 'plans' });
+            }
+          }
+
+          // Then fetch from DB to be sure
           const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
           if (profile) {
             const userObj = {
               id: session.user.id,
               email: session.user.email,
-              full_name: profile.full_name,
+              full_name: profile.full_name || 'User',
               avatar_url: profile.avatar_url || '',
               subscription_tier: profile.subscription_tier || 'free'
             };
             setUser(userObj);
+            localStorage.setItem('ytm_user', JSON.stringify(userObj));
             
             // View management
             if (userObj.subscription_tier === 'free') {
@@ -127,6 +131,8 @@ function App() {
       } catch (e) {
         console.warn("Storage hydration failed:", e);
         setView({ name: 'account' });
+      } finally {
+        setIsAuthLoading(false);
       }
     };
     hydrate();
@@ -574,68 +580,83 @@ function App() {
 
   // App Session Listener
   useEffect(() => {
-    // If already loaded from localStorage, fetch dependent data (for non-guest)
     if (user?.id && !user.isGuest) {
       fetchFavorites(user.id);
       fetchHistory(user.id);
     }
 
-    // Fallback: check Supabase session (e.g. after OAuth redirect or page refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log("🔐 Auth event:", _event, session?.user?.id);
+
       if (session?.user) {
-        // FAST PATH: Instantly build optimistic user from session for zero-delay UI rendering
+        // 1. FAST PATH: Optimistic update from Cache
         const cachedUserStr = localStorage.getItem('ytm_user');
         const cachedUser = cachedUserStr ? JSON.parse(cachedUserStr) : null;
+
+        // If the cache is for a different user, ignore it!
+        const isValidCache = cachedUser && cachedUser.id === session.user.id;
 
         const fastUser = {
           id: session.user.id,
           email: session.user.email,
-          full_name: session.user.user_metadata?.full_name ?? session.user.email?.split('@')[0] ?? 'User',
-          avatar_url: session.user.user_metadata?.avatar_url ?? '',
-          subscription_tier: cachedUser?.subscription_tier ?? 'free',
+          full_name: isValidCache ? cachedUser.full_name : (session.user.user_metadata?.full_name ?? 'User'),
+          avatar_url: isValidCache ? cachedUser.avatar_url : (session.user.user_metadata?.avatar_url ?? ''),
+          subscription_tier: isValidCache ? cachedUser.subscription_tier : 'free',
           isGuest: false
         };
 
-        // Immediately update UI to prevent generic browser lockup!
         setUser(fastUser);
-        localStorage.setItem('ytm_user', JSON.stringify(fastUser));
-
-        // Handle post-login redirection fast!
-        if (_event === 'SIGNED_IN') {
-          setView(fastUser.subscription_tier === 'free' ? { name: 'plans' } : { name: 'home' });
+        if (_event === 'SIGNED_IN' || _event === 'INITIAL_SESSION') {
+           if (fastUser.subscription_tier !== 'free') setView({ name: 'home' });
         }
 
-        fetchFavorites(fastUser.id);
-        fetchHistory(fastUser.id);
-
-        // BACKGROUND SYNC: Extract Supabase Details to update Profile in background
+        // 2. BACKGROUND SYNC: Fetch real data from DB
         supabase
           .from('profiles')
-          .select('subscription_tier, full_name, avatar_url')
+          .select('subscription_tier, full_name, avatar_url, email')
           .eq('id', session.user.id)
           .single()
-          .then(({ data: profile }) => {
-          const finalUser = {
-            id: session.user.id,
-            email: session.user.email,
-            full_name: profile?.full_name || 'User',
-            avatar_url: profile?.avatar_url || '',
-            subscription_tier: profile?.subscription_tier || 'free'
-          };
-          setUser(finalUser);
-          
-          if (_event === 'SIGNED_IN') {
-             if (finalUser.subscription_tier === 'free') setView({ name: 'plans' });
-             else setView({ name: 'home' });
-          }
+          .then(({ data: profile, error: profileError }) => {
+            // Handle profile sync
+            const finalUser = {
+              id: session.user.id,
+              email: session.user.email,
+              full_name: profile?.full_name || fastUser.full_name,
+              avatar_url: profile?.avatar_url || fastUser.avatar_url,
+              subscription_tier: profile?.subscription_tier || fastUser.subscription_tier || 'free',
+              isGuest: false
+            };
+            
+            setUser(finalUser);
+            localStorage.setItem('ytm_user', JSON.stringify(finalUser));
 
-            // Safely Upsert missing details
-            supabase.from('profiles').upsert({
-              id: finalUser.id,
-              email: finalUser.email,
-              full_name: finalUser.full_name,
-              avatar_url: finalUser.avatar_url
-            }, { onConflict: 'id' }).then(() => console.log("🔥 Profile Synced In Background"));
+            // Sync favorites/history
+            fetchFavorites(finalUser.id);
+            fetchHistory(finalUser.id);
+
+            // Handle view redirection
+            if (_event === 'SIGNED_IN' || _event === 'INITIAL_SESSION') {
+              // Stay on current view unless it's the entry screens
+              if (['account', 'plans'].includes(view.name)) {
+                setView(finalUser.subscription_tier === 'free' ? { name: 'plans' } : { name: 'home' });
+              }
+            }
+
+            // 3. SECURE UPSERT: Only if profile is confirmed missing
+            // We use error code PGRST116 (no rows found for .single())
+            if (profileError && profileError.code === 'PGRST116') {
+              console.log("🆕 Initializing new profile for:", finalUser.email);
+              supabase.from('profiles').upsert({
+                id: finalUser.id,
+                email: finalUser.email,
+                full_name: finalUser.full_name,
+                avatar_url: finalUser.avatar_url
+                // Let DB DEFAULT handle subscription_tier ('free') to avoid overwriting 
+              }, { onConflict: 'id' }).then(({ error: upsertErr }) => {
+                if (upsertErr) console.error("❌ Profile init failed:", upsertErr);
+                else console.log("🔥 Profile created successfully");
+              });
+            }
           });
 
       } else if (_event === 'SIGNED_OUT') {

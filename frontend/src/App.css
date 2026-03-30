@@ -4354,3 +4354,186 @@ body {
   0%, 100% { transform: scaleY(1); opacity: 0.5; }
   50% { transform: scaleY(1.8); opacity: 1; }
 }
+
+/* ── Account View V3 ────────────────────────────────────────────────────────── */
+.acc-container-premium {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 60px 20px;
+}
+
+.acc-header-v3 {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  margin-bottom: 48px;
+}
+
+.acc-pfp-v3 {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #fff;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+}
+
+.acc-pfp-info h1 {
+  font-size: 32px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.acc-pfp-info p {
+  color: var(--text-secondary);
+  font-size: 16px;
+  margin-bottom: 16px;
+}
+
+.tier-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 16px;
+  border-radius: 100px;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.tier-badge.pro {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+  color: #000;
+}
+
+.tier-badge.base {
+  background: #3b82f6;
+  color: #fff;
+}
+
+.acc-sections-v3 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 24px;
+}
+
+.acc-card-v3 {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+.acc-card-v3 h3 {
+  font-size: 18px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.upgrad-banner {
+  background: linear-gradient(135deg, #1e1e1e, #2d2d2d);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.upgrad-banner b {
+  display: block;
+  font-size: 16px;
+  color: #fbbf24;
+}
+
+.upgrad-banner p {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.upgrad-banner button {
+  background: #fbbf24;
+  color: #000;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.primary-acc-btn {
+  background: #fff;
+  color: #000;
+  border: none;
+  padding: 12px;
+  border-radius: 12px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  cursor: pointer;
+}
+
+.secondary-acc-btn {
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  border: none;
+  padding: 12px;
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.claim-row-v3 {
+  display: flex;
+  gap: 8px;
+  background: rgba(0,0,0,0.2);
+  padding: 6px;
+  border-radius: 30px;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.claim-row-v3 input {
+  background: none;
+  border: none;
+  color: #fff;
+  padding: 8px 16px;
+  flex: 1;
+  outline: none;
+}
+
+.claim-row-v3 button {
+  background: #fff;
+  color: #000;
+  border: none;
+  padding: 8px 20px;
+  border-radius: 20px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pref-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.pref-row span { color: var(--text-secondary); }
+
+.logout-btn-v3 {
+  width: 100%;
+  background: rgba(255, 50, 50, 0.1);
+  color: #ff3232;
+  border: 1px solid rgba(255, 50, 50, 0.2);
+  padding: 14px;
+  border-radius: 100px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 40px;
+}
+
