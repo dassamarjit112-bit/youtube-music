@@ -4166,3 +4166,81 @@ body {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+
+/* --- Account Security Form --- */
+.acc-security-form-v3 {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.security-inputs-v3 {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.acc-security-form-v3 .input-with-icon-v3 {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.2s;
+}
+
+.acc-security-form-v3 .input-with-icon-v3:focus-within {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.acc-security-form-v3 .input-with-icon-v3 input {
+  flex: 1;
+  background: none;
+  border: none;
+  color: #fff;
+  padding: 14px 0;
+  outline: none;
+  font-size: 15px;
+}
+
+.security-submit-btn-v3 {
+  width: 100%;
+  padding: 14px;
+  background: rgba(255, 255, 255, 1);
+  color: #000;
+  border: none;
+  border-radius: 100px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.security-submit-btn-v3:hover {
+  background: #eee;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(255, 255, 255, 0.1);
+}
+
+.acc-card-v3 .subtext {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+.acc-pfp-v3-placeholder {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ff1e14, #ff5e57);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  font-weight: 800;
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(255, 30, 20, 0.3);
+}

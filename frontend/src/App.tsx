@@ -150,6 +150,8 @@ function App() {
     }
   }, [user]);
 
+  const isSubscribed = user?.subscription_tier === 'basic' || user?.subscription_tier === 'premium';
+
   useEffect(() => {
     localStorage.setItem("ytm_favorites", JSON.stringify(favorites));
     localStorage.setItem("ytm_downloads", JSON.stringify(downloads));
@@ -864,7 +866,6 @@ function App() {
 
   const navigateTo = (v: View) => {
     // Strict Blocking: If no subscription, only permit Account or Plans views
-    const isSubscribed = user?.subscription_tier === 'basic' || user?.subscription_tier === 'premium';
     if (!isSubscribed && v.name !== 'account' && v.name !== 'plans') {
       setView({ name: 'plans' });
       return;
@@ -919,66 +920,70 @@ function App() {
         )}
       </AnimatePresence>
 
-      {/* Sidebar */}
-      <aside className={`sidebar ${isSidebarOpen ? 'mobile-visible' : ''}`}>
-        <div className="logo-section" onClick={() => navigateTo({ name: 'home' })} style={{ cursor: 'pointer' }}>
-          <img src="/logo.png" className="logo-img" style={{ width: 28, height: 28 }} alt="" />
-          <span style={{ fontWeight: 800, color: '#fff', marginLeft: 8 }}>MusicTube</span>
-          <button className="mobile-only close-sidebar" onClick={() => setIsSidebarOpen(false)}>
-            <ArrowLeft size={24} />
-          </button>
-        </div>
-        <nav>
-          <button onClick={() => navigateTo({ name: "home" })} className={view.name === "home" ? "active" : ""}>
-            <Home size={24} /> <span>Home</span>
-          </button>
-          <button onClick={() => navigateTo({ name: "explore" })} className={view.name === "explore" ? "active" : ""}>
-            <Compass size={24} /> <span>Explore</span>
-          </button>
-          <button
-            onClick={() => isLoggedIn ? navigateTo({ name: "library" }) : setView({ name: 'account' })}
-            className={view.name === "library" ? "active" : ""}
-          >
-            <Library size={24} /> <span>Library</span>
-          </button>
-        </nav>
-        <div className="sidebar-divider" />
-        <div className="playlists-section">
-          <button className="new-playlist-btn" onClick={() => navigateTo({ name: 'library' })}>
-            <PlusCircle size={20} /> <span>New Playlist</span>
-          </button>
-          <div className="playlist-item" onClick={() => navigateTo({ name: 'library' })}>
-            <div className="playlist-icon liked"><ThumbsUp size={16} fill="currentColor" /></div>
-            <span>Liked Songs</span>
+      {/* Sidebar - Only visible if subscribed */}
+      {isSubscribed && (
+        <aside className={`sidebar ${isSidebarOpen ? 'mobile-visible' : ''}`}>
+          <div className="logo-section" onClick={() => navigateTo({ name: 'home' })} style={{ cursor: 'pointer' }}>
+            <img src="/logo.png" className="logo-img" style={{ width: 28, height: 28 }} alt="" />
+            <span style={{ fontWeight: 800, color: '#fff', marginLeft: 8 }}>MusicTube</span>
+            <button className="mobile-only close-sidebar" onClick={() => setIsSidebarOpen(false)}>
+              <ArrowLeft size={24} />
+            </button>
           </div>
-        </div>
+          <nav>
+            <button onClick={() => navigateTo({ name: "home" })} className={view.name === "home" ? "active" : ""}>
+              <Home size={24} /> <span>Home</span>
+            </button>
+            <button onClick={() => navigateTo({ name: "explore" })} className={view.name === "explore" ? "active" : ""}>
+              <Compass size={24} /> <span>Explore</span>
+            </button>
+            <button
+              onClick={() => isLoggedIn ? navigateTo({ name: "library" }) : setView({ name: 'account' })}
+              className={view.name === "library" ? "active" : ""}
+            >
+              <Library size={24} /> <span>Library</span>
+            </button>
+          </nav>
+          <div className="sidebar-divider" />
+          <div className="playlists-section">
+            <button className="new-playlist-btn" onClick={() => navigateTo({ name: 'library' })}>
+              <PlusCircle size={20} /> <span>New Playlist</span>
+            </button>
+            <div className="playlist-item" onClick={() => navigateTo({ name: 'library' })}>
+              <div className="playlist-icon liked"><ThumbsUp size={16} fill="currentColor" /></div>
+              <span>Liked Songs</span>
+            </div>
+          </div>
 
-        {/* Queue */}
-        {queue.length > 0 && (
-          <div className="queue-section">
-            <p className="queue-title">Queue ({queue.length})</p>
-            {queue.map((s, i) => (
-              <div
-                key={i}
-                className={`queue-item ${currentSong?.videoId === s.videoId ? "active" : ""}`}
-                onClick={() => playSong(s)}
-              >
-                <img src={s.thumbnail} alt="" />
-                <span>{s.title}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </aside>
+          {/* Queue */}
+          {queue.length > 0 && (
+            <div className="queue-section">
+              <p className="queue-title">Queue ({queue.length})</p>
+              {queue.map((s, i) => (
+                <div
+                  key={i}
+                  className={`queue-item ${currentSong?.videoId === s.videoId ? "active" : ""}`}
+                  onClick={() => playSong(s)}
+                >
+                  <img src={s.thumbnail} alt="" />
+                  <span>{s.title}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </aside>
+      )}
 
       {/* Main Content */}
       <main className="main-content">
         <header className="main-header">
           <div className="header-left">
             {isOffline && <div className="offline-pill"><PlusCircle size={14} /> Offline Mode</div>}
-            <button className="mobile-hide menu-btn" onClick={() => setIsSidebarOpen(true)}>
-              <Menu size={24} />
-            </button>
+            {isSubscribed && (
+              <button className="mobile-hide menu-btn" onClick={() => setIsSidebarOpen(true)}>
+                <Menu size={24} />
+              </button>
+            )}
             {!isSearchActive ? (
               <div className="mobile-only mobile-brand" onClick={() => navigateTo({ name: 'home' })}>
                 <img src="/logo.png" style={{ width: 24, height: 24, marginRight: 8 }} alt="" />
@@ -1003,30 +1008,34 @@ function App() {
             {(view.name === "artist" || view.name === "album" || view.name === "search") && !isSearchActive && (
               <button className="back-btn" onClick={goBack}><ArrowLeft size={20} /></button>
             )}
-            <div className="search-box desktop-only">
-              <Search size={20} />
-              <form onSubmit={handleSearch}>
-                <input
-                  type="text"
-                  placeholder="Search songs, albums, artists"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </form>
-            </div>
+            {isSubscribed && (
+              <div className="search-box desktop-only">
+                <Search size={20} />
+                <form onSubmit={handleSearch}>
+                  <input
+                    type="text"
+                    placeholder="Search songs, albums, artists"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </form>
+              </div>
+            )}
           </div>
           <div className="user-profile">
-            {!isSearchActive && (
+            {isSubscribed && !isSearchActive && (
               <button className="mobile-only search-trigger" onClick={() => setIsSearchActive(true)}>
                 <Search size={24} />
               </button>
             )}
-            <button
-              className="mobile-only search-trigger"
-              onClick={(e) => { e.stopPropagation(); setActiveMenuSong(currentSong); }}
-            >
-              <MoreVertical size={24} />
-            </button>
+            {isSubscribed && (
+              <button
+                className="mobile-only search-trigger"
+                onClick={(e) => { e.stopPropagation(); setActiveMenuSong(currentSong); }}
+              >
+                <MoreVertical size={24} />
+              </button>
+            )}
             {isLoggedIn ? (
               <div className="flex items-center gap-3">
                 {!isPremium && (
@@ -1499,33 +1508,59 @@ function App() {
                         </div>
 
                         <div className="acc-card-v3">
-                          <h3><ShieldCheck size={18} /> Account Security</h3>
-                          <p className="subtext">Set or update your login password.</p>
+                          <h3><ShieldCheck size={20} /> Account Security</h3>
+                          <p className="subtext">Update your login password to keep your account secure.</p>
                           <form 
-                            className="acc-claim-row-v3"
+                            className="acc-security-form-v3"
                             onSubmit={async (e) => {
                               e.preventDefault();
-                              const newPass = (e.target as any).newPassword.value;
-                              if (!newPass) return;
-                              const { error } = await supabase.auth.updateUser({ password: newPass });
-                              if (error) alert(error.message);
-                              else {
+                              const form = e.target as any;
+                              const newPass = form.newPassword.value;
+                              const confirmPass = form.confirmPassword.value;
+
+                              if (newPass !== confirmPass) {
+                                alert("Passwords do not match!");
+                                return;
+                              }
+
+                              if (newPass.length < 6) {
+                                alert("Password must be at least 6 characters long.");
+                                return;
+                              }
+
+                              try {
+                                const { error } = await supabase.auth.updateUser({ password: newPass });
+                                if (error) throw error;
                                 alert("Password updated successfully!");
-                                (e.target as any).reset();
+                                form.reset();
+                              } catch (err: any) {
+                                alert(err.message);
                               }
                             }}
                           >
-                            <div className="input-with-icon-v3" style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
-                              <Lock size={16} style={{ opacity: 0.5 }} />
-                              <input
-                                type="password"
-                                name="newPassword"
-                                placeholder="New password"
-                                style={{ background: 'none', border: 'none', color: '#fff', outline: 'none', flex: 1 }}
-                                required
-                              />
+                            <div className="security-inputs-v3">
+                              <div className="input-with-icon-v3">
+                                <Lock size={18} />
+                                <input
+                                  type="password"
+                                  name="newPassword"
+                                  placeholder="New password"
+                                  required
+                                />
+                              </div>
+                              <div className="input-with-icon-v3">
+                                <Shield size={18} />
+                                <input
+                                  type="password"
+                                  name="confirmPassword"
+                                  placeholder="Confirm new password"
+                                  required
+                                />
+                              </div>
                             </div>
-                            <button type="submit">Update</button>
+                            <button type="submit" className="security-submit-btn-v3">
+                              Update Password
+                            </button>
                           </form>
                         </div>
 
@@ -1864,8 +1899,8 @@ function App() {
         initialGiftCode={giftCodeToClaim}
       />
 
-      {/* Player Bar - Visible if song is selected */}
-      {currentSong && (
+      {/* Player Bar - Visible if song is selected AND user is subscribed */}
+      {currentSong && isSubscribed && (
         <footer className="player-bar-v2" onClick={() => navigateTo({ name: 'player' })}>
           <div className="mini-player-bg" style={{ backgroundImage: currentSong ? `url(${currentSong.thumbnail})` : 'none' }} />
           <div className="progress-bar-container">
@@ -1953,22 +1988,24 @@ function App() {
       )}
 
       {/* ── Mobile Bottom Navigation ── */}
-      <nav className="mobile-bottom-nav">
-        <button
-          className={view.name === "home" ? "active" : ""}
-          onClick={() => navigateTo({ name: "home" })}
-        >
-          <Home size={24} />
-          <span>Home</span>
-        </button>
-        <button
-          className={view.name === "library" ? "active" : ""}
-          onClick={() => isLoggedIn ? navigateTo({ name: "library" }) : setView({ name: 'account' })}
-        >
-          <Library size={24} />
-          <span>Library</span>
-        </button>
-      </nav>
+      {isSubscribed && (
+        <nav className="mobile-bottom-nav">
+          <button
+            className={view.name === "home" ? "active" : ""}
+            onClick={() => navigateTo({ name: "home" })}
+          >
+            <Home size={24} />
+            <span>Home</span>
+          </button>
+          <button
+            className={view.name === "library" ? "active" : ""}
+            onClick={() => isLoggedIn ? navigateTo({ name: "library" }) : setView({ name: 'account' })}
+          >
+            <Library size={24} />
+            <span>Library</span>
+          </button>
+        </nav>
+      )}
 
       {/* ── Hidden YouTube IFrame Container ── */}
       <div className="yt-engine">
