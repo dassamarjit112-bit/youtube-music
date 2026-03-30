@@ -97,12 +97,11 @@ export function Auth({ onLogin }: AuthProps) {
         });
         if (updateError) throw updateError;
         
-        // Upsert profile
         const { error: profileError } = await supabase.from('profiles').upsert({
           id: sessionData.session.user.id,
           email: sessionData.session.user.email,
-          full_name: data.name,
-          subscription_tier: 'free'
+          full_name: data.name
+          // DO NOT specify subscription_tier here to avoid overwriting existing plans!
         });
         if (profileError) throw profileError;
 
@@ -111,7 +110,7 @@ export function Auth({ onLogin }: AuthProps) {
           email: sessionData.session.user.email,
           full_name: data.name,
           avatar_url: sessionData.session.user.user_metadata?.avatar_url || '',
-          subscription_tier: 'free'
+          subscription_tier: 'unknown' // App.tsx will fetch the real one in background sync
         });
       } else {
         // If not logged in, create new account
@@ -127,8 +126,8 @@ export function Auth({ onLogin }: AuthProps) {
           await supabase.from('profiles').upsert({
             id: signUpData.user.id,
             email: signUpData.user.email,
-            full_name: data.name,
-            subscription_tier: 'free'
+            full_name: data.name
+            // Let DB DEFAULT handle 'free' for truly new accounts
           });
 
           onLogin({
@@ -136,7 +135,7 @@ export function Auth({ onLogin }: AuthProps) {
             email: signUpData.user.email,
             full_name: data.name,
             avatar_url: '',
-            subscription_tier: 'free'
+            subscription_tier: 'free' // Safe for brand new signUp
           });
         }
       }
