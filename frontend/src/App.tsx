@@ -584,43 +584,40 @@ const triggerAutoPlayExtension = async (lastSong: Song) => {
   const q = queueRef.current;
   if (q.length === 0) return;
 
-  // 1. Handle Repeat One (Keep this as is)
-  if (repeatMode === 'one' && currentSongRef.current) {
-    ytPlayer.seekTo(0);
-    setIsPlaying(true);
-    return;
-  }
-
   const currentIdx = q.findIndex((s) => s.videoId === currentSongRef.current?.videoId);
   let nextIdx = currentIdx + 1;
 
-  // 2. Logic for selecting the NEXT index
+  // 1. Logic for Shuffle
   if (isShuffle) {
     nextIdx = Math.floor(Math.random() * q.length);
-  } else if (nextIdx >= q.length) {
+  } 
+  
+  // 2. Logic for reaching the end of the manual queue
+  if (nextIdx >= q.length) {
     if (repeatMode === 'all') {
       nextIdx = 0;
     } else if (autoPlay) {
-      // TRIGGER: We reached the end, fetch more immediately
+      // THIS IS THE FORCE: Fetch next songs from the API automatically
       const lastSong = q[q.length - 1];
       await triggerAutoPlayExtension(lastSong);
-      return; // The extension function will set the new song
+      return; 
     } else {
       setIsPlaying(false);
       return;
     }
   }
 
-  // 3. Set the next song
+  // 3. Set the song and force play
   const nextSong = q[nextIdx];
   setCurrentSong(nextSong);
-  
-  // 4. PROACTIVE PRE-FETCH: If we are near the end of the newly updated queue,
-  // fetch the NEXT-NEXT batch so there's never a gap.
+  setIsPlaying(true);
+
+  // 4. Proactive Fetching: If we are near the end, get more songs NOW
   if (autoPlay && nextIdx >= q.length - 3) {
     triggerAutoPlayExtension(nextSong);
   }
 };
+
   
   // Always keep the ref pointing at the latest handleNext
   handleNextRef.current = handleNext;
