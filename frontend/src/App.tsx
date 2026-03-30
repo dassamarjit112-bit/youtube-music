@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import {
-  Play, Pause, SkipBack, SkipForward, Shuffle, Repeat,
+  Play, cue, Pause, SkipBack, SkipForward, Shuffle, Repeat,
   Volume2, ThumbsUp, MoreVertical, Search,
   Home, Compass, Library, PlusCircle, ArrowLeft, Music2, Menu
 } from "lucide-react";
