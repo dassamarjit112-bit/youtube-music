@@ -38,7 +38,6 @@ function App() {
   const [isSearching, setIsSearching] = useState(false);
 
   const [user, setUser] = useState<any>(GUEST_USER);
-  const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -60,7 +59,7 @@ function App() {
   const [playbackHistory, setPlaybackHistory] = useState<Song[]>([]);
   const [downloads, setDownloads] = useState<Song[]>([]);
   const [activeChip, setActiveChip] = useState<string | null>(null);
-  const [playlists, setPlaylists] = useState<{ name: string; tracks: Song[] }[]>([]);
+  const [playlists, setPlaylists] = useState<{ id: string; name: string; tracks: Song[] }[]>([]);
   const [activeMenuSong, setActiveMenuSong] = useState<Song | null>(null);
   const [showPlaylistDialog, setShowPlaylistDialog] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -119,6 +118,7 @@ function App() {
             };
             setUser(userObj);
             localStorage.setItem('ytm_user', JSON.stringify(userObj));
+            fetchPlaylists(userObj.id);
             
             // View management
             if (userObj.subscription_tier === 'free') {
@@ -131,8 +131,6 @@ function App() {
       } catch (e) {
         console.warn("Storage hydration failed:", e);
         setView({ name: 'account' });
-      } finally {
-        setIsAuthLoading(false);
       }
     };
     hydrate();
@@ -630,9 +628,10 @@ function App() {
             setUser(finalUser);
             localStorage.setItem('ytm_user', JSON.stringify(finalUser));
 
-            // Sync favorites/history
+            // Sync favorites/history/playlists
             fetchFavorites(finalUser.id);
             fetchHistory(finalUser.id);
+            fetchPlaylists(finalUser.id);
 
             // Handle view redirection
             if (_event === 'SIGNED_IN' || _event === 'INITIAL_SESSION') {
@@ -713,17 +712,82 @@ function App() {
     if (data) setPlaybackHistory(data as any);
   };
 
-  const createPlaylist = (name: string) => {
-    if (!name.trim()) return;
-    const newPlaylist = { name, tracks: activeMenuSong ? [activeMenuSong] : [] };
+  const fetchPlaylists = async (userId: string) => {
+    // 1. Fetch playlist metadata
+    const { data: pData } = await supabase.from('playlists').select('id, name').eq('user_id', userId);
+    if (!pData) return;
+
+    // 2. Fetch all items (Song list for each playlist)
+    const playlistsWithTracks = await Promise.all(pData.map(async (p) => {
+      const { data: items } = await supabase.from('playlist_items').select('*').eq('playlist_id', p.id).order('added_at', { ascending: true });
+      return { 
+        id: p.id, 
+        name: p.name, 
+        tracks: (items || []).map(i => ({
+          videoId: i.video_id,
+          title: i.title,
+          artist: i.artist,
+          thumbnail: i.thumbnail,
+          type: 'song'
+        } as Song)) 
+      };
+    }));
+    setPlaylists(playlistsWithTracks);
+  };
+
+  const createPlaylist = async (name: string) => {
+    if (!name.trim() || !user || user.isGuest) return;
+    
+    const { data, error } = await supabase.from('playlists').insert({
+      user_id: user.id,
+      name: name
+    }).select().single();
+
+    if (error) {
+      console.error("Playlist creation failed:", error);
+      return;
+    }
+
+    const newPlaylist = { id: data.id, name: data.name, tracks: activeMenuSong ? [activeMenuSong] : [] };
+
+    // If there was an active menu song, add it too!
+    if (activeMenuSong) {
+      await supabase.from('playlist_items').insert({
+        playlist_id: data.id,
+        video_id: activeMenuSong.videoId,
+        title: activeMenuSong.title,
+        artist: activeMenuSong.artist,
+        thumbnail: activeMenuSong.thumbnail
+      });
+    }
+
     setPlaylists(prev => [...prev, newPlaylist]);
     setActiveMenuSong(null);
   };
 
-  const addToPlaylist = (song: Song, playlistName: string) => {
-    setPlaylists(prev => prev.map(p =>
-      p.name === playlistName ? { ...p, tracks: [...p.tracks.filter(t => t.videoId !== song.videoId), song] } : p
-    ));
+  const addToPlaylist = async (song: Song, playlistId: string) => {
+    if (!user || user.isGuest) return;
+    
+    // Check if already in playlist (simplified)
+    const target = playlists.find(p => p.id === playlistId);
+    if (target?.tracks.some(t => t.videoId === song.videoId)) {
+       setActiveMenuSong(null);
+       return;
+    }
+
+    const { error } = await supabase.from('playlist_items').insert({
+      playlist_id: playlistId,
+      video_id: song.videoId,
+      title: song.title,
+      artist: song.artist,
+      thumbnail: song.thumbnail
+    });
+
+    if (!error) {
+      setPlaylists(prev => prev.map(p =>
+        p.id === playlistId ? { ...p, tracks: [...p.tracks, song] } : p
+      ));
+    }
     setActiveMenuSong(null);
   };
 
@@ -1340,9 +1404,8 @@ function App() {
                         <p className="no-data">Create your first playlist to get started.</p>
                       ) : (
                         <div className="track-list">
-                          {playlists.map((p, i) => (
-                            <div key={i} className="track-row" onClick={() => {
-                              // We reuse albumData for simplicity but set view to playlist + local ID
+                          {playlists.map((p) => (
+                            <div key={p.id} className="track-row" onClick={() => {
                               setAlbumData({
                                 title: p.name,
                                 artist: "Your Playlist",
@@ -1352,7 +1415,7 @@ function App() {
                                 duration: "",
                                 tracks: p.tracks
                               });
-                              setView({ name: 'playlist', id: 'local_' + i } as any);
+                              setView({ name: 'playlist', id: p.id } as any);
                             }}>
                               <div className="playlist-icon-sm"><Music2 size={20} /></div>
                               <div className="track-info-col">
@@ -1514,8 +1577,8 @@ function App() {
                         </button>
                         <div className="submenu-section">
                           <p>Add to Playlist</p>
-                          {playlists.map((p, i) => (
-                            <button key={i} onClick={() => addToPlaylist(activeMenuSong, p.name)}>
+                          {playlists.map((p) => (
+                            <button key={p.id} onClick={() => addToPlaylist(activeMenuSong, p.id)}>
                               <Music2 size={18} /> {p.name}
                             </button>
                           ))}
