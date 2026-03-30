@@ -31,17 +31,7 @@ const FALLBACK_THUMB = "https://images.unsplash.com/photo-1470225620780-dba8ba36
 const GUEST_USER = { id: 'guest', email: '', full_name: 'Guest', avatar_url: '', subscription_tier: 'free', isGuest: true };
 
 function App() {
-  const [view, setView] = useState<View>(() => {
-    try {
-      const saved = localStorage.getItem('ytm_user');
-      const u = saved ? JSON.parse(saved) : null;
-      if (!u) return { name: "account" };
-      if (!u.subscription_tier) return { name: "plans" };
-      return { name: "home" };
-    } catch {
-      return { name: "account" };
-    }
-  });
+  const [view, setView] = useState<View>({ name: "account" }); // Start at account by default while we auth
   const [homeData, setHomeData] = useState<HomeSection[]>([]);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -119,7 +109,7 @@ function App() {
         if (savedPlaylists) setPlaylists(JSON.parse(savedPlaylists));
         if (savedSong) setCurrentSong(JSON.parse(savedSong));
         
-        // ── SYNC WITH SUPABASE (REAL-TIME PLAN CHECK) ──
+        // ── SYNC WITH SUPABASE (THE ONLY SOURCE OF TRUTH) ──
         const { data: { session } } = await supabase.auth.getSession();
         
         if (session?.user) {
@@ -133,7 +123,6 @@ function App() {
               subscription_tier: profile.subscription_tier || 'free'
             };
             setUser(userObj);
-            localStorage.setItem('ytm_user', JSON.stringify(userObj));
             
             // View management
             if (userObj.subscription_tier === 'free') {
@@ -147,17 +136,7 @@ function App() {
             } else { setView({ name: 'home' }); }
           }
         } else {
-          // Fallback to local user
-          const storedUser = localStorage.getItem("ytm_user");
-          if (storedUser) {
-            const u = JSON.parse(storedUser);
-            setUser(u);
-            if (savedView) {
-              try { setView(JSON.parse(savedView)); } catch { setView({ name: 'account' }); }
-            } else { setView({ name: 'account' }); }
-          } else {
-            setView({ name: 'account' });
-          }
+          setView({ name: 'account' });
         }
       } catch (e) {
         console.warn("Storage hydration failed:", e);
@@ -654,14 +633,19 @@ function App() {
           .eq('id', session.user.id)
           .single()
           .then(({ data: profile }) => {
-            const finalUser = {
-              ...fastUser,
-              full_name: profile?.full_name || fastUser.full_name,
-              avatar_url: profile?.avatar_url || fastUser.avatar_url,
-              subscription_tier: profile?.subscription_tier || 'free'
-            };
-            setUser(finalUser);
-            localStorage.setItem('ytm_user', JSON.stringify(finalUser));
+          const finalUser = {
+            id: session.user.id,
+            email: session.user.email,
+            full_name: profile?.full_name || 'User',
+            avatar_url: profile?.avatar_url || '',
+            subscription_tier: profile?.subscription_tier || 'free'
+          };
+          setUser(finalUser);
+          
+          if (_event === 'SIGNED_IN') {
+             if (finalUser.subscription_tier === 'free') setView({ name: 'plans' });
+             else setView({ name: 'home' });
+          }
 
             // Safely Upsert missing details
             supabase.from('profiles').upsert({
