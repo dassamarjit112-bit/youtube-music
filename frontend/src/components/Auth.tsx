@@ -16,47 +16,82 @@ export function Auth({ onLogin }: AuthProps) {
   const [loading, setLoading] = useState(false);
   const [activePage, setActivePage] = useState<AuthPage>('login');
   const [error, setError] = useState<string | null>(null);
-  
-  // Temporary storage for OAuth users during setup
-  const [tempUser, setTempUser] = useState<{ email: string, name: string } | null>(null);
 
   useEffect(() => {
-    // Check if we just returned from OAuth and need to complete profile
+    // Check if we just returned from OAuth redirect
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        // Check if profile is complete
-        const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
-        
-        if (!profile || !profile.full_name) {
-          setTempUser({ 
-            email: session.user.email || '', 
-            name: session.user.user_metadata?.full_name || '' 
-          });
-          setActivePage('profile-setup');
-        } else {
-          onLogin({
-            id: session.user.id,
-            email: session.user.email,
-            full_name: profile.full_name,
-            avatar_url: profile.avatar_url || '',
-            subscription_tier: profile.subscription_tier || 'free'
-          });
-        }
+      if (!session?.user) return;
+
+      // Read the intent that was saved before OAuth redirect
+      const oauthIntent = localStorage.getItem('oauth_intent');
+      localStorage.removeItem('oauth_intent'); // Clean up
+
+      // Check if profile already exists in database
+      const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+
+      if (profile) {
+        // Profile exists — log in directly with existing data (works for both login & register)
+        onLogin({
+          id: session.user.id,
+          email: session.user.email,
+          full_name: profile.full_name || session.user.user_metadata?.full_name || 'User',
+          avatar_url: profile.avatar_url || session.user.user_metadata?.avatar_url || '',
+          subscription_tier: profile.subscription_tier || 'free'
+        });
+      } else if (oauthIntent === 'register') {
+        // No profile + came from Register page → Create new profile
+        const newUser = {
+          id: session.user.id,
+          email: session.user.email || '',
+          full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || 'User',
+          avatar_url: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture || ''
+        };
+
+        await supabase.from('profiles').upsert({
+          id: newUser.id,
+          email: newUser.email,
+          full_name: newUser.full_name,
+          avatar_url: newUser.avatar_url
+          // Let DB DEFAULT handle subscription_tier ('free')
+        });
+
+        onLogin({
+          ...newUser,
+          subscription_tier: 'free'
+        });
+      } else {
+        // No profile + came from Login page → Reject, must register first
+        await supabase.auth.signOut();
+        setError('No account found. Please register first with Google, then log in.');
+        setActivePage('login');
       }
     };
     
     checkSession();
   }, [onLogin]);
 
-  const handleOAuth = async (provider: 'google') => {
+  // OAuth with intent tracking
+  const handleOAuthLogin = async (provider: 'google') => {
     setLoading(true);
     setError(null);
+    localStorage.setItem('oauth_intent', 'login'); // Mark as login intent
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: { redirectTo: window.location.origin }
     });
-    if (error) { setError(error.message); setLoading(false); }
+    if (error) { setError(error.message); setLoading(false); localStorage.removeItem('oauth_intent'); }
+  };
+
+  const handleOAuthRegister = async (provider: 'google') => {
+    setLoading(true);
+    setError(null);
+    localStorage.setItem('oauth_intent', 'register'); // Mark as register intent
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: window.location.origin }
+    });
+    if (error) { setError(error.message); setLoading(false); localStorage.removeItem('oauth_intent'); }
   };
 
   const handleLogin = async (email: string, pass: string) => {
@@ -122,7 +157,6 @@ export function Auth({ onLogin }: AuthProps) {
         if (signUpError) throw signUpError;
         
         if (signUpData.user) {
-          // Profile is usually created via trigger in Supabase, but let's be explicit
           await supabase.from('profiles').upsert({
             id: signUpData.user.id,
             email: signUpData.user.email,
@@ -135,7 +169,7 @@ export function Auth({ onLogin }: AuthProps) {
             email: signUpData.user.email,
             full_name: data.name,
             avatar_url: '',
-            subscription_tier: 'free' // Safe for brand new signUp
+            subscription_tier: 'free'
           });
         }
       }
@@ -159,9 +193,9 @@ export function Auth({ onLogin }: AuthProps) {
           <AnimatePresence mode="wait">
             {activePage === 'login' && (
               <LoginView 
-                onBack={() => {}} // No back from login entry
+                onBack={() => {}} 
                 onRegisterClick={() => setActivePage('register')}
-                onOAuth={handleOAuth}
+                onOAuth={handleOAuthLogin}
                 onSubmit={handleLogin}
                 loading={loading}
                 error={error}
@@ -172,7 +206,7 @@ export function Auth({ onLogin }: AuthProps) {
                 onBack={() => setActivePage('login')}
                 onLoginClick={() => setActivePage('login')}
                 onNext={() => setActivePage('profile-setup')}
-                onOAuth={handleOAuth}
+                onOAuth={handleOAuthRegister}
                 loading={loading}
               />
             )}
@@ -182,8 +216,6 @@ export function Auth({ onLogin }: AuthProps) {
                 onSubmit={handleProfileSetup}
                 loading={loading}
                 error={error}
-                initialName={tempUser?.name}
-                initialEmail={tempUser?.email}
               />
             )}
           </AnimatePresence>

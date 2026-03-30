@@ -30,7 +30,7 @@ export function RegisterView({ onBack, onLoginClick, onNext, onOAuth, loading }:
           className="social-pill-btn google"
         >
           <img src="https://www.gstatic.com/images/branding/googleg/1x/googleg_standard_color_128dp.png" alt="G" />
-          Register with Google
+          Sign up with Google
         </button>
       </div>
 
