@@ -55,7 +55,7 @@ function App() {
       return GUEST_USER;
     }
   });
-  
+
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(0.8);
@@ -106,13 +106,13 @@ function App() {
     const savedPlaylists = localStorage.getItem("ytm_playlists");
     const savedSong = localStorage.getItem("ytm_currentSong");
     const savedView = localStorage.getItem("ytm_view");
-    
+
     try {
       if (savedFavs) setFavorites(JSON.parse(savedFavs));
       if (savedDLs) setDownloads(JSON.parse(savedDLs));
       if (savedPlaylists) setPlaylists(JSON.parse(savedPlaylists));
       if (savedSong) setCurrentSong(JSON.parse(savedSong));
-      
+
       // Load user and subscription state
       const storedUser = localStorage.getItem("ytm_user");
       if (storedUser) {
@@ -170,7 +170,7 @@ function App() {
 
     if (isPlaying) {
       requestWakeLock();
-      silentRef.current?.play().catch(() => {});
+      silentRef.current?.play().catch(() => { });
     } else {
       if (wakeLockRef.current) {
         wakeLockRef.current.release().then(() => {
@@ -189,7 +189,7 @@ function App() {
   queueRef.current = queue;
 
   // Ref so onEnded always sees the latest handleNext (fixes stale-closure autoplay bug)
-  const handleNextRef = useRef<() => void>(() => {});
+  const handleNextRef = useRef<() => void>(() => { });
 
   const ytPlayer = useYouTubePlayer("yt-player-container", {
     onStateChange: (state) => {
@@ -204,10 +204,10 @@ function App() {
         setIsPlaying(false);
         handleNextRef.current();
       } else if ((state === -1 || state === 5 || state === 3) && isPlayingRef.current) {
-         // Auto-play bridging: IFrame API often gets "stuck" unstarted/cued/buffering on mobile track changes.
-         setTimeout(() => {
-           if (isPlayingRef.current) ytPlayer.play();
-         }, 300);
+        // Auto-play bridging: IFrame API often gets "stuck" unstarted/cued/buffering on mobile track changes.
+        setTimeout(() => {
+          if (isPlayingRef.current) ytPlayer.play();
+        }, 300);
       }
     },
     onProgress: (p, secs) => {
@@ -222,8 +222,8 @@ function App() {
         code === 150 || code === 101
           ? "This video is restricted from being embedded."
           : code === 5
-          ? "HTML5 player error."
-          : `Playback error (code ${code}). Trying next track…`;
+            ? "HTML5 player error."
+            : `Playback error (code ${code}). Trying next track…`;
       setPlayerError(msg);
       setTimeout(() => {
         setPlayerError(null);
@@ -289,7 +289,7 @@ function App() {
     navigator.mediaSession.setActionHandler("seekforward", () => {
       ytPlayer.seekTo(Math.min(duration, playedSeconds + 10));
     });
-    
+
     // Smooth Android Playback
     if (isPlaying) navigator.mediaSession.playbackState = 'playing';
     else navigator.mediaSession.playbackState = 'paused';
@@ -309,7 +309,7 @@ function App() {
         // FAST PATH: Instantly build optimistic user from session for zero-delay UI rendering
         const cachedUserStr = localStorage.getItem('ytm_user');
         const cachedUser = cachedUserStr ? JSON.parse(cachedUserStr) : null;
-        
+
         const fastUser = {
           id: session.user.id,
           email: session.user.email,
@@ -322,10 +322,10 @@ function App() {
         // Immediately update UI to prevent generic browser lockup!
         setUser(fastUser);
         localStorage.setItem('ytm_user', JSON.stringify(fastUser));
-        
+
         // Handle post-login redirection fast!
         if (_event === 'SIGNED_IN') {
-           setView(fastUser.subscription_tier === 'free' ? { name: 'plans' } : { name: 'home' });
+          setView(fastUser.subscription_tier === 'free' ? { name: 'plans' } : { name: 'home' });
         }
 
         fetchFavorites(fastUser.id);
@@ -355,7 +355,7 @@ function App() {
               avatar_url: finalUser.avatar_url
             }, { onConflict: 'id' }).then(() => console.log("🔥 Profile Synced In Background"));
           });
-          
+
       } else if (_event === 'SIGNED_OUT') {
         setUser(GUEST_USER);
         localStorage.removeItem('ytm_user');
@@ -418,7 +418,7 @@ function App() {
   };
 
   const addToPlaylist = (song: Song, playlistName: string) => {
-    setPlaylists(prev => prev.map(p => 
+    setPlaylists(prev => prev.map(p =>
       p.name === playlistName ? { ...p, tracks: [...p.tracks.filter(t => t.videoId !== song.videoId), song] } : p
     ));
     setActiveMenuSong(null);
@@ -478,12 +478,12 @@ function App() {
       const moodsRes = await api.moods().catch(() => ({ categories: [] }));
       const newsRes = await api.newReleases().catch(() => ({ albums: [] }));
       const chartsRes = await api.charts().catch(() => ({ songs: [] }));
-      
+
       const sections = [];
       if (chartsRes.songs?.length) sections.push({ title: "Charts", items: chartsRes.songs });
       if (newsRes.albums?.length) sections.push({ title: "New Releases", items: newsRes.albums });
       if (moodsRes.categories?.length) sections.push(...moodsRes.categories);
-      
+
       // If still empty, use a fallback
       if (sections.length === 0) {
         const homeFallback = await api.home();
@@ -562,96 +562,72 @@ function App() {
     }
   };
 
-  
-const triggerAutoPlayExtension = async (lastSong: Song) => {
-  try {
-    const res = await api.watch(lastSong.videoId);
-    if (res.tracks && res.tracks.length > 0) {
-      // Filter out songs already in the queue to prevent loops
-      const currentIds = new Set(queueRef.current.map(s => s.videoId));
-      const filteredTracks = res.tracks.filter(t => !currentIds.has(t.videoId));
-      
-      const nextBatch = filteredTracks.slice(0, 20); // Get a fresh batch of 20
-      
-      setQueue(prev => [...prev, ...nextBatch]);
 
-      // If the player was actually stopped because it hit the end, start it now
-      if (!isPlayingRef.current) {
-         const firstNewSong = nextBatch[0];
-         if (firstNewSong) {
-           setCurrentSong(firstNewSong);
-           setIsPlaying(true);
-         }
+  const triggerAutoPlayExtension = async (lastSong: Song) => {
+    try {
+      const res = await api.watch(lastSong.videoId);
+      if (res.tracks && res.tracks.length > 0) {
+        // Filter out songs already in the queue to prevent loops
+        const currentIds = new Set(queueRef.current.map(s => s.videoId));
+        const filteredTracks = res.tracks.filter(t => !currentIds.has(t.videoId));
+
+        const nextBatch = filteredTracks.slice(0, 20); // Get a fresh batch of 20
+
+        setQueue(prev => [...prev, ...nextBatch]);
+
+        // If the player was actually stopped because it hit the end, start it now
+        if (!isPlayingRef.current) {
+          const firstNewSong = nextBatch[0];
+          if (firstNewSong) {
+            setCurrentSong(firstNewSong);
+            setIsPlaying(true);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Auto-play extension failed:", e);
+    }
+  };
+  const handleNext = async () => {
+    const q = queueRef.current;
+    if (q.length === 0) return;
+
+    const currentIdx = q.findIndex((s) => s.videoId === currentSongRef.current?.videoId);
+    let nextIdx = currentIdx + 1;
+
+    // 1. Logic for Shuffle
+    if (isShuffle) {
+      nextIdx = Math.floor(Math.random() * q.length);
+    }
+
+    // 2. Logic for reaching the end of the manual queue
+    if (nextIdx >= q.length) {
+      if (repeatMode === 'all') {
+        nextIdx = 0;
+      } else if (autoPlay) {
+        // THIS IS THE FORCE: Fetch next songs from the API automatically
+        const lastSong = q[q.length - 1];
+        await triggerAutoPlayExtension(lastSong);
+        return;
+      } else {
+        setIsPlaying(false);
+        return;
       }
     }
-  } catch (e) {
-    console.error("Auto-play extension failed:", e);
-  }
-};
- const handleNext = async () => {
-  const q = queueRef.current;
-  if (q.length === 0) return;
 
-  const currentIdx = q.findIndex((s) => s.videoId === currentSongRef.current?.videoId);
-  let nextIdx = currentIdx + 1;
-
-  // 1. Logic for Shuffle
-  if (isShuffle) {
-    nextIdx = Math.floor(Math.random() * q.length);
-  } 
-  
-  // 2. Logic for reaching the end of the manual queue
-  if (nextIdx >= q.length) {
-    if (repeatMode === 'all') {
-      nextIdx = 0;
-    } else if (autoPlay) {
-      // THIS IS THE FORCE: Fetch next songs from the API automatically
-      const lastSong = q[q.length - 1];
-      await triggerAutoPlayExtension(lastSong);
-      return; 
-    } else {
-      setIsPlaying(false);
-      return;
-    }
-  }
-
-  // 3. Set the song and force play
-  const nextSong = q[nextIdx];
-  setCurrentSong(nextSong);
-  setIsPlaying(true);
-
-  // 4. Proactive Fetching: If we are near the end, get more songs NOW
-  if (autoPlay && nextIdx >= q.length - 3) {
-    triggerAutoPlayExtension(nextSong);
-  }
-};
-const onTogglePlay = useCallback(() => {
-  if (!currentSong) return;
-
-  // Check the actual player state instead of just the React variable
-  if (isPlaying) {
-    ytPlayer.pause();
-    setIsPlaying(false); // Manually sync immediately for UI snappy-ness
-  } else {
-    ytPlayer.play();
+    // 3. Set the song and force play
+    const nextSong = q[nextIdx];
+    setCurrentSong(nextSong);
     setIsPlaying(true);
-  }
-}, [isPlaying, currentSong, ytPlayer]);
-    
-  const { load, play, pause, seekTo, setVolume } = useYouTubePlayer("yt-player-container", {
-  onEnded: () => {
-    // Only trigger next if we aren't already in the middle of a change
-    handleNext();
-  },
-  onStateChange: (state) => {
-    // YT.PlayerState.PLAYING is 1, PAUSED is 2
-    if (state === 1) setIsPlaying(true);
-    if (state === 2) setIsPlaying(false);
-  },
-  // ... other options
-});
 
-  
+    // 4. Proactive Fetching: If we are near the end, get more songs NOW
+    if (autoPlay && nextIdx >= q.length - 3) {
+      triggerAutoPlayExtension(nextSong);
+    }
+  };
+
+
+
   // Always keep the ref pointing at the latest handleNext
   handleNextRef.current = handleNext;
 
@@ -677,7 +653,7 @@ const onTogglePlay = useCallback(() => {
       setView({ name: 'account' });
       return;
     }
-    
+
     const isSubscribed = user?.subscription_tier === 'basic' || user?.subscription_tier === 'premium';
     if (!isSubscribed) {
       setShowSubscriptionModal(true);
@@ -686,7 +662,7 @@ const onTogglePlay = useCallback(() => {
     }
 
     console.log("▶ Playing:", song.title, "| videoId:", song.videoId);
-    
+
     // Set immediate song to start playback
     if (isOffline && !downloads.some(d => d.videoId === song.videoId)) {
       setPlayerError("You are offline. Only downloaded songs can be played.");
@@ -710,8 +686,8 @@ const onTogglePlay = useCallback(() => {
       silentRef.current = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFav7//v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+');
       silentRef.current.loop = true;
     }
-    silentRef.current.play().catch(() => {});
-    
+    silentRef.current.play().catch(() => { });
+
     // AI Radio / Up Next Generator
     if (songList && songList.length > 10) {
       setQueue(songList);
@@ -721,7 +697,7 @@ const onTogglePlay = useCallback(() => {
         const res = await api.watch(song.videoId);
         if (res.tracks && res.tracks.length > 5) {
           // Flattening and diversifying the list (YouTube Music Style: 30+ Tracks)
-          const radioMix = [song, ...res.tracks.slice(1, 45)]; 
+          const radioMix = [song, ...res.tracks.slice(1, 45)];
           setQueue(radioMix);
         } else {
           setQueue(prev => prev.some(s => s.videoId === song.videoId) ? prev : [...prev, song]);
@@ -793,41 +769,41 @@ const onTogglePlay = useCallback(() => {
   };
 
   useEffect(() => {
-  if (!("mediaSession" in navigator) || !currentSong) return;
+    if (!("mediaSession" in navigator) || !currentSong) return;
 
-  navigator.mediaSession.metadata = new window.MediaMetadata({
-    title: currentSong.title,
-    artist: currentSong.artist || "MusicTube",
-    album: currentSong.album || "Trending",
-    artwork: [
-      { src: currentSong.thumbnail, sizes: '512x512', type: 'image/png' },
-    ]
-  });
-
-  // CRITICAL: Update position state so background play doesn't time out
-  if (duration > 0) {
-    navigator.mediaSession.setPositionState({
-      duration: duration,
-      playbackRate: 1.0,
-      position: playedSeconds,
+    navigator.mediaSession.metadata = new window.MediaMetadata({
+      title: currentSong.title,
+      artist: currentSong.artist || "MusicTube",
+      album: currentSong.album || "Trending",
+      artwork: [
+        { src: currentSong.thumbnail, sizes: '512x512', type: 'image/png' },
+      ]
     });
-  }
 
-  navigator.mediaSession.setActionHandler('play', () => setIsPlaying(true));
-  navigator.mediaSession.setActionHandler('pause', () => setIsPlaying(false));
-  navigator.mediaSession.setActionHandler('previoustrack', handlePrev);
-  navigator.mediaSession.setActionHandler('nexttrack', handleNext);
-  
-  // Seek handler for lock-screen progress bars
-  navigator.mediaSession.setActionHandler('seekto', (details) => {
-    if (details.seekTime !== undefined && duration > 0) {
-      const newPos = details.seekTime / duration;
-      setPlayed(newPos);
-      ytPlayer.seekTo(newPos);
+    // CRITICAL: Update position state so background play doesn't time out
+    if (duration > 0) {
+      navigator.mediaSession.setPositionState({
+        duration: duration,
+        playbackRate: 1.0,
+        position: playedSeconds,
+      });
     }
-  });
-}, [currentSong, duration, playedSeconds]); // Added playedSeconds to update progress on lockscreen
-  
+
+    navigator.mediaSession.setActionHandler('play', () => setIsPlaying(true));
+    navigator.mediaSession.setActionHandler('pause', () => setIsPlaying(false));
+    navigator.mediaSession.setActionHandler('previoustrack', handlePrev);
+    navigator.mediaSession.setActionHandler('nexttrack', handleNext);
+
+    // Seek handler for lock-screen progress bars
+    navigator.mediaSession.setActionHandler('seekto', (details) => {
+      if (details.seekTime !== undefined && duration > 0) {
+        const newPos = details.seekTime / duration;
+        setPlayed(newPos);
+        ytPlayer.seekTo(newPos);
+      }
+    });
+  }, [currentSong, duration, playedSeconds]); // Added playedSeconds to update progress on lockscreen
+
 
   // --- Main App ---
   // App always renders; Auth is shown as a view (account page)
@@ -837,7 +813,7 @@ const onTogglePlay = useCallback(() => {
       {/* Sidebar Overlay (Mobile) */}
       <AnimatePresence>
         {isSidebarOpen && (
-          <motion.div 
+          <motion.div
             className="sidebar-overlay"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -863,8 +839,8 @@ const onTogglePlay = useCallback(() => {
           <button onClick={() => navigateTo({ name: "explore" })} className={view.name === "explore" ? "active" : ""}>
             <Compass size={24} /> <span>Explore</span>
           </button>
-          <button 
-            onClick={() => isLoggedIn ? navigateTo({ name: "library" }) : setView({ name: 'account' })} 
+          <button
+            onClick={() => isLoggedIn ? navigateTo({ name: "library" }) : setView({ name: 'account' })}
             className={view.name === "library" ? "active" : ""}
           >
             <Library size={24} /> <span>Library</span>
@@ -918,7 +894,7 @@ const onTogglePlay = useCallback(() => {
                   <ArrowLeft size={20} />
                 </button>
                 <form onSubmit={handleSearch} className="m-search-form">
-                   <input
+                  <input
                     type="text"
                     autoFocus
                     placeholder="Search music"
@@ -949,12 +925,12 @@ const onTogglePlay = useCallback(() => {
                 <Search size={24} />
               </button>
             )}
-            <button 
-          className="mobile-only search-trigger" 
-          onClick={(e) => { e.stopPropagation(); setActiveMenuSong(currentSong); }}
-        >
-          <MoreVertical size={24} />
-        </button>
+            <button
+              className="mobile-only search-trigger"
+              onClick={(e) => { e.stopPropagation(); setActiveMenuSong(currentSong); }}
+            >
+              <MoreVertical size={24} />
+            </button>
             {isLoggedIn ? (
               <div className="flex items-center gap-3">
                 {!isPremium && (
@@ -986,8 +962,8 @@ const onTogglePlay = useCallback(() => {
                 <div className="home-view">
                   <div className="chips">
                     {["Energize", "Relax", "Workout", "Commute", "Focus"].map((c) => (
-                      <button 
-                        key={c} 
+                      <button
+                        key={c}
                         className={`chip ${activeChip === c ? 'active' : ''}`}
                         onClick={() => handleChipClick(c)}
                       >
@@ -998,7 +974,7 @@ const onTogglePlay = useCallback(() => {
                   <ControlledAd isPremium={isPremium} adSlot="home_top" />
                   {homeData.length === 0 && (
                     <div className="loading-grid">
-                      {[1,2,3,4].map(i => <div key={i} className="skeleton-card" />)}
+                      {[1, 2, 3, 4].map(i => <div key={i} className="skeleton-card" />)}
                     </div>
                   )}
                   {homeData.map((s, i) => (
@@ -1025,16 +1001,16 @@ const onTogglePlay = useCallback(() => {
                             }}
                           >
                             <div className="card-thumb">
-                              <img 
-                                src={item.thumbnail} 
-                                alt="" 
-                                loading="lazy" 
-                                onError={(e) => { (e.target as any).src = 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&h=500&fit=crop'; }} 
+                              <img
+                                src={item.thumbnail}
+                                alt=""
+                                loading="lazy"
+                                onError={(e) => { (e.target as any).src = 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&h=500&fit=crop'; }}
                               />
                               {(item.type === "song" || item.type === "video") && (
                                 <div className="play-overlay">
                                   <Play size={24} fill="#fff" />
-                                  <button 
+                                  <button
                                     className={`fav-btn ${favorites.some(f => f.videoId === item.videoId) ? 'active' : ''}`}
                                     onClick={(e) => { e.stopPropagation(); toggleFavorite(item as Song); }}
                                   >
@@ -1069,7 +1045,7 @@ const onTogglePlay = useCallback(() => {
                   <ControlledAd isPremium={isPremium} adSlot="explore_top" />
                   {isLoadingExplore ? (
                     <div className="loading-grid">
-                      {[1,2,3].map(i => <div key={i} className="skeleton-card" />)}
+                      {[1, 2, 3].map(i => <div key={i} className="skeleton-card" />)}
                     </div>
                   ) : exploreData.map((s, i) => (
                     <div key={i} className="section-container">
@@ -1090,12 +1066,12 @@ const onTogglePlay = useCallback(() => {
                             }}
                           >
                             <div className="card-thumb">
-                              <img 
-                                src={item.thumbnail} 
-                                alt="" 
-                                onError={(e) => { (e.target as any).src = 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=200&h=200&fit=crop'; }} 
+                              <img
+                                src={item.thumbnail}
+                                alt=""
+                                onError={(e) => { (e.target as any).src = 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=200&h=200&fit=crop'; }}
                               />
-                              {s.title === 'Charts' && <div className="rank">#{j+1}</div>}
+                              {s.title === 'Charts' && <div className="rank">#{j + 1}</div>}
                             </div>
                             <div className="card-info">
                               <h3>{item.title || item.name}</h3>
@@ -1130,8 +1106,8 @@ const onTogglePlay = useCallback(() => {
                                 <h3>{song.title}</h3>
                                 <p>{song.artist}</p>
                               </div>
-                              <button 
-                                className="more-btn-row" 
+                              <button
+                                className="more-btn-row"
                                 onClick={(e) => { e.stopPropagation(); setActiveMenuSong(song); }}
                               >
                                 <MoreVertical size={18} />
@@ -1147,7 +1123,7 @@ const onTogglePlay = useCallback(() => {
                         <PlusCircle size={24} /> Create New Playlist
                       </button>
                     </section>
-                    
+
                     <section>
                       <div className="section-header">
                         <h2>Playlists</h2>
@@ -1195,8 +1171,8 @@ const onTogglePlay = useCallback(() => {
                                 <p>{song.artist}</p>
                               </div>
                               <div className="track-actions-row">
-                                <button 
-                                  className="more-btn-row" 
+                                <button
+                                  className="more-btn-row"
                                   onClick={(e) => { e.stopPropagation(); setActiveMenuSong(song); }}
                                 >
                                   <MoreVertical size={18} />
@@ -1219,10 +1195,10 @@ const onTogglePlay = useCallback(() => {
                           {playbackHistory.slice(0, 10).map((song, i) => (
                             <div key={i} className="track-row" onClick={() => playSong(song)}>
                               <span className="track-num">{i + 1}</span>
-                              <img 
-                                src={song.thumbnail} 
-                                alt="" 
-                                onError={(e) => { (e.target as any).src = 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=200&h=200&fit=crop'; }} 
+                              <img
+                                src={song.thumbnail}
+                                alt=""
+                                onError={(e) => { (e.target as any).src = 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=200&h=200&fit=crop'; }}
                               />
                               <div className="track-info-col">
                                 <h3>{song.title}</h3>
@@ -1254,20 +1230,20 @@ const onTogglePlay = useCallback(() => {
                               ) as Song[];
                               playSong(item as Song, songList);
                             } else if (item.type === "artist" && item.browseId) {
-                                setView({ name: "artist", id: item.browseId } as any);
-                              } else if (item.type === "album" && item.browseId) {
-                                setView({ name: "album", id: item.browseId } as any);
-                              } else if (item.type === "playlist" && (item.playlistId || item.browseId)) {
-                                setView({ name: "playlist", id: item.playlistId || item.browseId } as any);
-                              }
+                              setView({ name: "artist", id: item.browseId } as any);
+                            } else if (item.type === "album" && item.browseId) {
+                              setView({ name: "album", id: item.browseId } as any);
+                            } else if (item.type === "playlist" && (item.playlistId || item.browseId)) {
+                              setView({ name: "playlist", id: item.playlistId || item.browseId } as any);
+                            }
                           }}
                         >
-                        <img 
-  src={item.thumbnail} 
-  alt="" 
-  className="row-thumb" 
-  onError={(e) => { (e.target as any).src = FALLBACK_THUMB; }} 
-/>
+                          <img
+                            src={item.thumbnail}
+                            alt=""
+                            className="row-thumb"
+                            onError={(e) => { (e.target as any).src = FALLBACK_THUMB; }}
+                          />
                           <div className="row-info">
                             <h3>{item.title || item.name}</h3>
                             <p className="row-type-badge">{item.type}</p>
@@ -1275,15 +1251,15 @@ const onTogglePlay = useCallback(() => {
                           </div>
                           <div className="row-actions">
                             {(item.type === "song" || item.type === "video") && (
-                              <button 
+                              <button
                                 className={`dl-btn ${downloads.some(d => d.videoId === item.videoId) ? 'active' : ''}`}
                                 onClick={(e) => { e.stopPropagation(); toggleDownload(item as Song); }}
                               >
                                 <PlusCircle size={18} />
                               </button>
                             )}
-                            <button 
-                              className="more-btn-row" 
+                            <button
+                              className="more-btn-row"
                               onClick={(e) => { e.stopPropagation(); setActiveMenuSong(item as Song); }}
                             >
                               <MoreVertical size={18} />
@@ -1300,7 +1276,7 @@ const onTogglePlay = useCallback(() => {
               <AnimatePresence>
                 {activeMenuSong && (
                   <div className="menu-overlay" onClick={() => setActiveMenuSong(null)}>
-                    <motion.div 
+                    <motion.div
                       className="menu-content"
                       initial={{ y: "100%" }}
                       animate={{ y: 0 }}
@@ -1319,7 +1295,7 @@ const onTogglePlay = useCallback(() => {
                           <Play size={20} /> Play
                         </button>
                         <button onClick={() => { toggleFavorite(activeMenuSong); setActiveMenuSong(null); }}>
-                          <ThumbsUp size={20} fill={favorites.some(f => f.videoId === activeMenuSong.videoId) ? "currentColor" : "none"} /> 
+                          <ThumbsUp size={20} fill={favorites.some(f => f.videoId === activeMenuSong.videoId) ? "currentColor" : "none"} />
                           {favorites.some(f => f.videoId === activeMenuSong.videoId) ? 'Remove from Liked' : 'Like'}
                         </button>
                         <button onClick={() => { toggleDownload(activeMenuSong); setActiveMenuSong(null); }}>
@@ -1348,10 +1324,10 @@ const onTogglePlay = useCallback(() => {
                 <div className="dialog-overlay">
                   <div className="dialog-card">
                     <h3>New Playlist</h3>
-                    <input 
-                      type="text" 
-                      placeholder="Playlist name" 
-                      autoFocus 
+                    <input
+                      type="text"
+                      placeholder="Playlist name"
+                      autoFocus
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                           createPlaylist((e.target as HTMLInputElement).value);
@@ -1376,7 +1352,7 @@ const onTogglePlay = useCallback(() => {
                 <div className="account-view">
                   {!isLoggedIn ? (
                     <div className="guest-login-zone">
-                      <Auth onLogin={(u: any) => { 
+                      <Auth onLogin={(u: any) => {
                         setUser(u);
                         const hasPlan = u.subscription_tier && u.subscription_tier !== 'free';
                         setView(hasPlan ? { name: 'home' } : { name: 'plans' });
@@ -1421,9 +1397,9 @@ const onTogglePlay = useCallback(() => {
                           <h3>Gift Codes</h3>
                           <p className="subtext">Have a code? Claim it to activate features.</p>
                           <div className="claim-row-v3">
-                            <input 
-                              type="text" 
-                              placeholder="Enter code" 
+                            <input
+                              type="text"
+                              placeholder="Enter code"
                               value={giftCodeToClaim}
                               onChange={(e) => setGiftCodeToClaim(e.target.value)}
                             />
@@ -1438,12 +1414,12 @@ const onTogglePlay = useCallback(() => {
                         <div className="acc-card-v3">
                           <h3>Preferences</h3>
                           <div className="pref-row">
-                             <span>Playback Quality</span>
-                             <b>Always High</b>
+                            <span>Playback Quality</span>
+                            <b>Always High</b>
                           </div>
                           <div className="pref-row">
-                             <span>Restricted Mode</span>
-                             <b>Off</b>
+                            <span>Restricted Mode</span>
+                            <b>Off</b>
                           </div>
                         </div>
 
@@ -1459,286 +1435,286 @@ const onTogglePlay = useCallback(() => {
               {/* ── PLAYER VIEW (DESKTOP & MOBILE) ── */}
               {view.name === "player" && currentSong && (
                 <div className="player-full-view">
-                   <div className="player-bg-blur" style={{ backgroundImage: `url(${currentSong.thumbnail})` }} />
-                   <div className="player-content-grid">
-                      <div className="player-left">
-                         <div className="player-back-zone">
-                            <button className="back-btn-v4" onClick={() => setView({ name: 'home' })}>
-                              <ArrowLeft size={24} /> <span>Home</span>
-                            </button>
-                          </div>
-                          <div className="player-art-container" onClick={() => setShowFloatingControls(!showFloatingControls)}>
-                            <img 
-  src={currentSong.thumbnail} 
-  className="player-art-v3" 
-  alt="" 
-  onError={(e) => { (e.target as any).src = FALLBACK_THUMB; }}
-/>
-                            <AnimatePresence>
-                              {showFloatingControls && (
-                                <motion.div 
-                                  className="floating-player-controls"
-                                  initial={{ opacity: 0, scale: 0.9 }}
-                                  animate={{ opacity: 1, scale: 1 }}
-                                  exit={{ opacity: 0, scale: 0.9 }}
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <button onClick={handlePrev} className="float-btn"><SkipBack size={32} fill="currentColor" /></button>
-                                  <button className="float-play-circle" onClick={() => setIsPlaying(!isPlaying)}>
-                                    {isPlaying ? <Pause size={48} fill="currentColor" /> : <Play size={48} fill="currentColor" style={{ marginLeft: 6 }} />}
-                                  </button>
-                                  <button onClick={handleNext} className="float-btn"><SkipForward size={32} fill="currentColor" /></button>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                          </div>
-                         <div className="player-info-v3">
-                            <h2>{currentSong.title}</h2>
-                            <p>{currentSong.artist} • {currentSong.album}</p>
-                            <div className="player-actions-v3">
-                               <button className="act-btn"><ThumbsUp size={24} /></button>
-                               <button className="act-btn" onClick={() => setActiveMenuSong(currentSong)}><PlusCircle size={24} /></button>
-                               <button className="act-btn"><Search size={24} /></button>
-                            </div>
-                         </div>
+                  <div className="player-bg-blur" style={{ backgroundImage: `url(${currentSong.thumbnail})` }} />
+                  <div className="player-content-grid">
+                    <div className="player-left">
+                      <div className="player-back-zone">
+                        <button className="back-btn-v4" onClick={() => setView({ name: 'home' })}>
+                          <ArrowLeft size={24} /> <span>Home</span>
+                        </button>
                       </div>
-                      <div className="player-right">
-                         <div className="queue-header-v3">
-                            <h3>Up Next</h3>
-                            <div className="queue-modes">
-                               <button className={isShuffle ? 'active' : ''} onClick={handleShuffleToggle}><Shuffle size={18} /></button>
-                               <button className={repeatMode !== 'none' ? 'active' : ''} onClick={handleRepeatToggle}><Repeat size={18} /> {repeatMode === 'one' && '1'}</button>
-                            </div>
-                         </div>
-                         <div className="player-queue-list">
-                            {queue.map((s, i) => (
-  <div 
-    key={i} 
-    className={`q-row-v3 ${s.videoId === currentSong.videoId ? 'active' : ''}`}
-    onClick={() => setCurrentSong(s)}
-  >
-     <img src={s.thumbnail} alt="" onError={(e) => { (e.target as any).src = FALLBACK_THUMB; }} />
-     <div className="q-info">
-        <p className="q-title">{s.title}</p>
-        <p className="q-artist">{s.artist}</p>
-     </div>
-     {s.videoId === currentSong.videoId && <div className="q-playing-icon"><Music2 size={16} /></div>}
-  </div>
-))}
-                             
-                             {autoPlay && (
-                               <div className="auto-play-indicator">
-                                 <div className="ap-header">
-                                   <span>Autoplay is on</span>
-                                   <button 
-                                     className={`ap-toggle ${autoPlay ? 'active' : ''}`}
-                                     onClick={() => setAutoPlay(!autoPlay)}
-                                   >
-                                     <div className="ap-dot" />
-                                   </button>
-                                 </div>
-                                 <p className="ap-desc">Similar songs will play automatically</p>
-                               </div>
-                             )}
-                          </div>
+                      <div className="player-art-container" onClick={() => setShowFloatingControls(!showFloatingControls)}>
+                        <img
+                          src={currentSong.thumbnail}
+                          className="player-art-v3"
+                          alt=""
+                          onError={(e) => { (e.target as any).src = FALLBACK_THUMB; }}
+                        />
+                        <AnimatePresence>
+                          {showFloatingControls && (
+                            <motion.div
+                              className="floating-player-controls"
+                              initial={{ opacity: 0, scale: 0.9 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              exit={{ opacity: 0, scale: 0.9 }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button onClick={handlePrev} className="float-btn"><SkipBack size={32} fill="currentColor" /></button>
+                              <button className="float-play-circle" onClick={() => setIsPlaying(!isPlaying)}>
+                                {isPlaying ? <Pause size={48} fill="currentColor" /> : <Play size={48} fill="currentColor" style={{ marginLeft: 6 }} />}
+                              </button>
+                              <button onClick={handleNext} className="float-btn"><SkipForward size={32} fill="currentColor" /></button>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
-                   </div>
-
-                    {/* Floating Bottom Controls for Player View */}
-                    <div className="player-floating-bottom">
-                      <div className="player-controls-pill">
-                         <div className="prog-container-v4">
-                           <span className="time">{formatTime(playedSeconds)}</span>
-                           <input type="range" min={0} max={0.9999} step="any" value={played} onChange={handleSeek} />
-                           <span className="time">{formatTime(duration)}</span>
-                         </div>
-                         <div className="ctrl-btns-v4">
-                            <button onClick={handlePrev} className="ctrl-side-btn"><SkipBack size={28} fill="currentColor" /></button>
-                            <button className="play-pill-btn" onClick={() => setIsPlaying(!isPlaying)}>
-                               {isPlaying ? <Pause size={32} fill="currentColor" /> : <Play size={32} fill="currentColor" style={{ marginLeft: 4 }} />}
-                            </button>
-                            <button onClick={handleNext} className="ctrl-side-btn"><SkipForward size={28} fill="currentColor" /></button>
-                         </div>
+                      <div className="player-info-v3">
+                        <h2>{currentSong.title}</h2>
+                        <p>{currentSong.artist} • {currentSong.album}</p>
+                        <div className="player-actions-v3">
+                          <button className="act-btn"><ThumbsUp size={24} /></button>
+                          <button className="act-btn" onClick={() => setActiveMenuSong(currentSong)}><PlusCircle size={24} /></button>
+                          <button className="act-btn"><Search size={24} /></button>
+                        </div>
                       </div>
                     </div>
+                    <div className="player-right">
+                      <div className="queue-header-v3">
+                        <h3>Up Next</h3>
+                        <div className="queue-modes">
+                          <button className={isShuffle ? 'active' : ''} onClick={handleShuffleToggle}><Shuffle size={18} /></button>
+                          <button className={repeatMode !== 'none' ? 'active' : ''} onClick={handleRepeatToggle}><Repeat size={18} /> {repeatMode === 'one' && '1'}</button>
+                        </div>
+                      </div>
+                      <div className="player-queue-list">
+                        {queue.map((s, i) => (
+                          <div
+                            key={i}
+                            className={`q-row-v3 ${s.videoId === currentSong.videoId ? 'active' : ''}`}
+                            onClick={() => setCurrentSong(s)}
+                          >
+                            <img src={s.thumbnail} alt="" onError={(e) => { (e.target as any).src = FALLBACK_THUMB; }} />
+                            <div className="q-info">
+                              <p className="q-title">{s.title}</p>
+                              <p className="q-artist">{s.artist}</p>
+                            </div>
+                            {s.videoId === currentSong.videoId && <div className="q-playing-icon"><Music2 size={16} /></div>}
+                          </div>
+                        ))}
+
+                        {autoPlay && (
+                          <div className="auto-play-indicator">
+                            <div className="ap-header">
+                              <span>Autoplay is on</span>
+                              <button
+                                className={`ap-toggle ${autoPlay ? 'active' : ''}`}
+                                onClick={() => setAutoPlay(!autoPlay)}
+                              >
+                                <div className="ap-dot" />
+                              </button>
+                            </div>
+                            <p className="ap-desc">Similar songs will play automatically</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Floating Bottom Controls for Player View */}
+                  <div className="player-floating-bottom">
+                    <div className="player-controls-pill">
+                      <div className="prog-container-v4">
+                        <span className="time">{formatTime(playedSeconds)}</span>
+                        <input type="range" min={0} max={0.9999} step="any" value={played} onChange={handleSeek} />
+                        <span className="time">{formatTime(duration)}</span>
+                      </div>
+                      <div className="ctrl-btns-v4">
+                        <button onClick={handlePrev} className="ctrl-side-btn"><SkipBack size={28} fill="currentColor" /></button>
+                        <button className="play-pill-btn" onClick={() => setIsPlaying(!isPlaying)}>
+                          {isPlaying ? <Pause size={32} fill="currentColor" /> : <Play size={32} fill="currentColor" style={{ marginLeft: 4 }} />}
+                        </button>
+                        <button onClick={handleNext} className="ctrl-side-btn"><SkipForward size={28} fill="currentColor" /></button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
-      
+
               {/* ── PLANS SELECTION ── */}
               {view.name === "plans" && (
                 <div className="plans-selection-view">
-                   <div className="plans-hero">
-                     <img src="/logo.png" alt="" />
-                     <h1>MusicTube Premium</h1>
-                     <p>Pick a plan to start your journey.</p>
-                   </div>
-                   <div className="plans-grid-v3">
-                     <div className="plan-card-v3">
-                        <div className="p-header">Basic</div>
-                        <div className="p-price">₹199<span>/lifetime</span></div>
-                        <ul className="p-list">
-                          <li>Play music & entire features</li>
-                          <li>Core app access</li>
-                          <li>Contains Ads</li>
-                        </ul>
-                        <button className="p-btn" onClick={() => setShowSubscriptionModal(true)}>Get Basic</button>
-                     </div>
-                     <div className="plan-card-v3 pro">
-                        <div className="p-header">Premium Pro</div>
-                        <div className="p-price">₹399<span>/lifetime</span></div>
-                        <ul className="p-list">
-                          <li>No Ads</li>
-                          <li>Background Play</li>
-                          <li>Priority Updates</li>
-                        </ul>
-                        <button className="p-btn pro" onClick={() => setShowSubscriptionModal(true)}>Get Pro</button>
-                     </div>
-                   </div>
-                   <div className="plans-footer">
-                     <button onClick={() => setView({ name: 'home' })} className="skip-link">Maybe Later</button>
-                   </div>
+                  <div className="plans-hero">
+                    <img src="/logo.png" alt="" />
+                    <h1>MusicTube Premium</h1>
+                    <p>Pick a plan to start your journey.</p>
+                  </div>
+                  <div className="plans-grid-v3">
+                    <div className="plan-card-v3">
+                      <div className="p-header">Basic</div>
+                      <div className="p-price">₹199<span>/lifetime</span></div>
+                      <ul className="p-list">
+                        <li>Play music & entire features</li>
+                        <li>Core app access</li>
+                        <li>Contains Ads</li>
+                      </ul>
+                      <button className="p-btn" onClick={() => setShowSubscriptionModal(true)}>Get Basic</button>
+                    </div>
+                    <div className="plan-card-v3 pro">
+                      <div className="p-header">Premium Pro</div>
+                      <div className="p-price">₹399<span>/lifetime</span></div>
+                      <ul className="p-list">
+                        <li>No Ads</li>
+                        <li>Background Play</li>
+                        <li>Priority Updates</li>
+                      </ul>
+                      <button className="p-btn pro" onClick={() => setShowSubscriptionModal(true)}>Get Pro</button>
+                    </div>
+                  </div>
+                  <div className="plans-footer">
+                    <button onClick={() => setView({ name: 'home' })} className="skip-link">Maybe Later</button>
+                  </div>
                 </div>
               )}
 
 
-      {/* ── PLAYER ── */}
-          {view.name === "artist" && (
-            <motion.div 
-              className="detail-view"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            >
-              {isLoading && <div className="loader" />}
-              {artistData && (
-                <>
-                  <div className="detail-hero" style={{ backgroundImage: `url(${artistData.thumbnail})` }}>
-                    <div className="detail-hero-overlay">
-                      <h1>{artistData.name}</h1>
-                      <p>{artistData.subscribers}</p>
-                      {artistData.description && <p className="desc">{artistData.description}</p>}
-                    </div>
-                  </div>
-                  <div className="detail-body">
-                    {artistData.songs.length > 0 && (
-                      <div className="section-container">
-                        <h2>Popular Songs</h2>
-                        <div className="track-list">
-                          {artistData.songs.map((song, i) => (
-                            <div
-                              key={i}
-                              className={`track-row ${currentSong?.videoId === song.videoId ? "playing" : ""}`}
-                              onClick={() => playSong(song, artistData.songs)}
-                            >
-                              <span className="track-num">
-                                {currentSong?.videoId === song.videoId && isPlaying
-                                  ? <Music2 size={14} className="eq-anim" />
-                                  : i + 1}
-                              </span>
-                              <img src={song.thumbnail} alt="" />
-                              <div className="track-info-col">
-                                <h3>{song.title}</h3>
-                                <p>{song.artist}</p>
-                              </div>
-                              <div className="track-actions-row">
-                                <button 
-                                  className={`dl-btn ${downloads.some(d => d.videoId === song.videoId) ? 'active' : ''}`}
-                                  onClick={(e) => { e.stopPropagation(); toggleDownload(song); }}
+              {/* ── PLAYER ── */}
+              {view.name === "artist" && (
+                <motion.div
+                  className="detail-view"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  {isLoading && <div className="loader" />}
+                  {artistData && (
+                    <>
+                      <div className="detail-hero" style={{ backgroundImage: `url(${artistData.thumbnail})` }}>
+                        <div className="detail-hero-overlay">
+                          <h1>{artistData.name}</h1>
+                          <p>{artistData.subscribers}</p>
+                          {artistData.description && <p className="desc">{artistData.description}</p>}
+                        </div>
+                      </div>
+                      <div className="detail-body">
+                        {artistData.songs.length > 0 && (
+                          <div className="section-container">
+                            <h2>Popular Songs</h2>
+                            <div className="track-list">
+                              {artistData.songs.map((song, i) => (
+                                <div
+                                  key={i}
+                                  className={`track-row ${currentSong?.videoId === song.videoId ? "playing" : ""}`}
+                                  onClick={() => playSong(song, artistData.songs)}
                                 >
-                                  <PlusCircle size={16} />
-                                </button>
-                                <span className="track-dur">{song.duration}</span>
-                              </div>
+                                  <span className="track-num">
+                                    {currentSong?.videoId === song.videoId && isPlaying
+                                      ? <Music2 size={14} className="eq-anim" />
+                                      : i + 1}
+                                  </span>
+                                  <img src={song.thumbnail} alt="" />
+                                  <div className="track-info-col">
+                                    <h3>{song.title}</h3>
+                                    <p>{song.artist}</p>
+                                  </div>
+                                  <div className="track-actions-row">
+                                    <button
+                                      className={`dl-btn ${downloads.some(d => d.videoId === song.videoId) ? 'active' : ''}`}
+                                      onClick={(e) => { e.stopPropagation(); toggleDownload(song); }}
+                                    >
+                                      <PlusCircle size={16} />
+                                    </button>
+                                    <span className="track-dur">{song.duration}</span>
+                                  </div>
+                                </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {artistData.albums.length > 0 && (
-                      <div className="section-container">
-                        <h2>Albums</h2>
-                        <div className="horizontal-scroll">
-                          {artistData.albums.map((album, i) => (
-                            <div key={i} className="card" onClick={() => album.browseId && setView({ name: "album", id: album.browseId } as any)}>
-                              <div className="card-thumb"><img src={album.thumbnail} alt="" /></div>
-                              <div className="card-info"><h3>{album.title}</h3><p>{album.year}</p></div>
+                          </div>
+                        )}
+                        {artistData.albums.length > 0 && (
+                          <div className="section-container">
+                            <h2>Albums</h2>
+                            <div className="horizontal-scroll">
+                              {artistData.albums.map((album, i) => (
+                                <div key={i} className="card" onClick={() => album.browseId && setView({ name: "album", id: album.browseId } as any)}>
+                                  <div className="card-thumb"><img src={album.thumbnail} alt="" /></div>
+                                  <div className="card-info"><h3>{album.title}</h3><p>{album.year}</p></div>
+                                </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </>
+                    </>
+                  )}
+                </motion.div>
               )}
-            </motion.div>
-          )}
 
-          {/* ── ALBUM / PLAYLIST ── */}
-          {(view.name === "album" || view.name === "playlist") && (
-            <motion.div 
-              className="detail-view"
-              initial={{ scale: 0.98, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 1.02, opacity: 0 }}
-            >
-              {isLoading && <div className="loader" />}
-              {albumData && (
-                <>
-                  <div className="album-header">
-                    <img src={albumData.thumbnail} alt="" className="album-cover" />
-                    <div className="album-meta">
-                      <p className="album-label">{view.name.toUpperCase()}</p>
-                      <h1>{albumData.title}</h1>
-                      <p>{albumData.artist} {albumData.year && `• ${albumData.year}`}</p>
-                      <p>{albumData.trackCount} tracks {albumData.duration && `• ${albumData.duration}`}</p>
-                      <button
-                        className="play-all-btn"
-                        onClick={() => albumData.tracks.length > 0 && playSong(albumData.tracks[0], albumData.tracks)}
-                      >
-                        <Play size={18} fill="#000" /> Play All
-                      </button>
-                    </div>
-                  </div>
-                  <div className="track-list">
-                    {albumData.tracks.map((track, i) => (
-                      <div
-                        key={i}
-                        className={`track-row ${currentSong?.videoId === track.videoId ? "playing" : ""}`}
-                        onClick={() => playSong(track, albumData.tracks)}
-                      >
-                        <span className="track-num">
-                          {currentSong?.videoId === track.videoId && isPlaying
-                            ? <Music2 size={14} className="eq-anim" />
-                            : i + 1}
-                        </span>
-                        <div className="track-info-col">
-                          <h3>{track.title}</h3>
-                          <p>{track.artist}</p>
-                        </div>
-                        <div className="track-actions-row">
-                          <button 
-                            className="more-btn-row" 
-                            onClick={(e) => { e.stopPropagation(); setActiveMenuSong(track); }}
+              {/* ── ALBUM / PLAYLIST ── */}
+              {(view.name === "album" || view.name === "playlist") && (
+                <motion.div
+                  className="detail-view"
+                  initial={{ scale: 0.98, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 1.02, opacity: 0 }}
+                >
+                  {isLoading && <div className="loader" />}
+                  {albumData && (
+                    <>
+                      <div className="album-header">
+                        <img src={albumData.thumbnail} alt="" className="album-cover" />
+                        <div className="album-meta">
+                          <p className="album-label">{view.name.toUpperCase()}</p>
+                          <h1>{albumData.title}</h1>
+                          <p>{albumData.artist} {albumData.year && `• ${albumData.year}`}</p>
+                          <p>{albumData.trackCount} tracks {albumData.duration && `• ${albumData.duration}`}</p>
+                          <button
+                            className="play-all-btn"
+                            onClick={() => albumData.tracks.length > 0 && playSong(albumData.tracks[0], albumData.tracks)}
                           >
-                            <MoreVertical size={18} />
+                            <Play size={18} fill="#000" /> Play All
                           </button>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </>
+                      <div className="track-list">
+                        {albumData.tracks.map((track, i) => (
+                          <div
+                            key={i}
+                            className={`track-row ${currentSong?.videoId === track.videoId ? "playing" : ""}`}
+                            onClick={() => playSong(track, albumData.tracks)}
+                          >
+                            <span className="track-num">
+                              {currentSong?.videoId === track.videoId && isPlaying
+                                ? <Music2 size={14} className="eq-anim" />
+                                : i + 1}
+                            </span>
+                            <div className="track-info-col">
+                              <h3>{track.title}</h3>
+                              <p>{track.artist}</p>
+                            </div>
+                            <div className="track-actions-row">
+                              <button
+                                className="more-btn-row"
+                                onClick={(e) => { e.stopPropagation(); setActiveMenuSong(track); }}
+                              >
+                                <MoreVertical size={18} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </motion.div>
               )}
+              {/* End of view checks */}
             </motion.div>
-          )}
-          {/* End of view checks */}
-          </motion.div>
-        </AnimatePresence>
-      </section>
+          </AnimatePresence>
+        </section>
       </main>
 
-      <SubscriptionModal 
-        user={user} 
-        isOpen={showSubscriptionModal} 
+      <SubscriptionModal
+        user={user}
+        isOpen={showSubscriptionModal}
         onClose={() => {
           setShowSubscriptionModal(false);
           setGiftCodeToClaim('');
@@ -1755,102 +1731,102 @@ const onTogglePlay = useCallback(() => {
       {/* Player Bar - Only visible to subscribers */}
       {(user?.subscription_tier === 'basic' || user?.subscription_tier === 'premium') && (
         <footer className="player-bar-v2" onClick={() => navigateTo({ name: 'player' })}>
-        <div className="mini-player-bg" style={{ backgroundImage: currentSong ? `url(${currentSong.thumbnail})` : 'none' }} />
-        <div className="progress-bar-container">
-          <input
-            type="range" min={0} max={0.9999} step="any"
-            value={played}
-            onChange={handleSeek}
-            className="progress-range"
-            onClick={(e) => e.stopPropagation()}
-          />
-        </div>
-        <div className="player-main">
-          <div className="track-info">
-            {currentSong ? (
-              <>
-                <img 
-                  src={currentSong.thumbnail} 
-                  alt="" 
-                  className="thumb" 
-                  onError={(e) => { (e.target as any).src = 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=100&h=100&fit=crop'; }} 
-                />
-                <div className="text">
-                  <h3>{currentSong.title}</h3>
-                  <p>{currentSong.artist} • {currentSong.duration}</p>
-                </div>
-              </>
-            ) : <p className="no-song">No song playing</p>}
-          </div>
-
-          {playerError && (
-            <div className="player-error">{playerError}</div>
-          )}
-
-          <div className="controls">
-            <button onClick={(e) => { e.stopPropagation(); handlePrev(); }}><SkipBack size={24} fill="currentColor" /></button>
-            <button
-              className="play-btn"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!currentSong) return;
-                setIsPlaying(!isPlaying);
-              }}
-            >
-              {isPlaying ? <Pause size={32} fill="currentColor" /> : <Play size={32} fill="currentColor" />}
-            </button>
-            <button onClick={(e) => { e.stopPropagation(); handleNext(); }}><SkipForward size={24} fill="currentColor" /></button>
-          </div>
-
-          <div className="actions">
-            <div className="progress-labels">
-              <span>{formatTime(playedSeconds)} / {formatTime(duration)}</span>
-            </div>
-            <button
-              className="icon-btn"
-              onClick={(e) => { e.stopPropagation(); setIsMuted((m) => !m); }}
-              title={isMuted ? "Unmute" : "Mute"}
-            >
-              <Volume2 size={20} style={{ opacity: isMuted ? 0.4 : 1 }} />
-            </button>
+          <div className="mini-player-bg" style={{ backgroundImage: currentSong ? `url(${currentSong.thumbnail})` : 'none' }} />
+          <div className="progress-bar-container">
             <input
-              type="range" min={0} max={1} step="any"
-              value={isMuted ? 0 : volume}
-              onChange={(e) => { setVolume(parseFloat(e.target.value)); setIsMuted(false); }}
-              className="volume-range"
+              type="range" min={0} max={0.9999} step="any"
+              value={played}
+              onChange={handleSeek}
+              className="progress-range"
               onClick={(e) => e.stopPropagation()}
             />
-            <button
-              className={`icon-btn ${isShuffle ? 'active' : ''}`}
-              onClick={(e) => { e.stopPropagation(); handleShuffleToggle(); }}
-              title="Shuffle"
-            >
-              <Shuffle size={18} />
-            </button>
-            <button
-              className={`icon-btn ${repeatMode !== 'none' ? 'active' : ''}`}
-              onClick={(e) => { e.stopPropagation(); handleRepeatToggle(); }}
-              title={`Repeat ${repeatMode}`}
-            >
-              <Repeat size={18} />
-              {repeatMode === 'one' && <span className="repeat-one-indicator">1</span>}
-            </button>
           </div>
-        </div>
-      </footer>
+          <div className="player-main">
+            <div className="track-info">
+              {currentSong ? (
+                <>
+                  <img
+                    src={currentSong.thumbnail}
+                    alt=""
+                    className="thumb"
+                    onError={(e) => { (e.target as any).src = 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=100&h=100&fit=crop'; }}
+                  />
+                  <div className="text">
+                    <h3>{currentSong.title}</h3>
+                    <p>{currentSong.artist} • {currentSong.duration}</p>
+                  </div>
+                </>
+              ) : <p className="no-song">No song playing</p>}
+            </div>
+
+            {playerError && (
+              <div className="player-error">{playerError}</div>
+            )}
+
+            <div className="controls">
+              <button onClick={(e) => { e.stopPropagation(); handlePrev(); }}><SkipBack size={24} fill="currentColor" /></button>
+              <button
+                className="play-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!currentSong) return;
+                  setIsPlaying(!isPlaying);
+                }}
+              >
+                {isPlaying ? <Pause size={32} fill="currentColor" /> : <Play size={32} fill="currentColor" />}
+              </button>
+              <button onClick={(e) => { e.stopPropagation(); handleNext(); }}><SkipForward size={24} fill="currentColor" /></button>
+            </div>
+
+            <div className="actions">
+              <div className="progress-labels">
+                <span>{formatTime(playedSeconds)} / {formatTime(duration)}</span>
+              </div>
+              <button
+                className="icon-btn"
+                onClick={(e) => { e.stopPropagation(); setIsMuted((m) => !m); }}
+                title={isMuted ? "Unmute" : "Mute"}
+              >
+                <Volume2 size={20} style={{ opacity: isMuted ? 0.4 : 1 }} />
+              </button>
+              <input
+                type="range" min={0} max={1} step="any"
+                value={isMuted ? 0 : volume}
+                onChange={(e) => { setVolume(parseFloat(e.target.value)); setIsMuted(false); }}
+                className="volume-range"
+                onClick={(e) => e.stopPropagation()}
+              />
+              <button
+                className={`icon-btn ${isShuffle ? 'active' : ''}`}
+                onClick={(e) => { e.stopPropagation(); handleShuffleToggle(); }}
+                title="Shuffle"
+              >
+                <Shuffle size={18} />
+              </button>
+              <button
+                className={`icon-btn ${repeatMode !== 'none' ? 'active' : ''}`}
+                onClick={(e) => { e.stopPropagation(); handleRepeatToggle(); }}
+                title={`Repeat ${repeatMode}`}
+              >
+                <Repeat size={18} />
+                {repeatMode === 'one' && <span className="repeat-one-indicator">1</span>}
+              </button>
+            </div>
+          </div>
+        </footer>
       )}
 
       {/* ── Mobile Bottom Navigation ── */}
       <nav className="mobile-bottom-nav">
-        <button 
-          className={view.name === "home" ? "active" : ""} 
+        <button
+          className={view.name === "home" ? "active" : ""}
           onClick={() => navigateTo({ name: "home" })}
         >
           <Home size={24} />
           <span>Home</span>
         </button>
-        <button 
-          className={view.name === "library" ? "active" : ""} 
+        <button
+          className={view.name === "library" ? "active" : ""}
           onClick={() => isLoggedIn ? navigateTo({ name: "library" }) : setView({ name: 'account' })}
         >
           <Library size={24} />
@@ -1864,7 +1840,7 @@ const onTogglePlay = useCallback(() => {
       </div>
       <AnimatePresence>
         {showMobilePlayer && currentSong && (
-          <FullScreenPlayer 
+          <FullScreenPlayer
             song={currentSong}
             isPlaying={isPlaying}
             played={played}
@@ -1887,9 +1863,9 @@ const onTogglePlay = useCallback(() => {
         )}
       </AnimatePresence>
 
-      <SubscriptionModal 
-        user={user} 
-        isOpen={showSubscriptionModal} 
+      <SubscriptionModal
+        user={user}
+        isOpen={showSubscriptionModal}
         onClose={() => {
           setShowSubscriptionModal(false);
           setGiftCodeToClaim('');
@@ -1902,16 +1878,16 @@ const onTogglePlay = useCallback(() => {
 }
 
 // ─── FULL SCREEN MOBILE PLAYER ───
-const FullScreenPlayer = ({ 
-  song, 
-  isPlaying, 
-  played, 
-  playedSeconds, 
-  duration, 
-  onClose, 
-  onTogglePlay, 
-  onNext, 
-  onPrev, 
+const FullScreenPlayer = ({
+  song,
+  isPlaying,
+  played,
+  playedSeconds,
+  duration,
+  onClose,
+  onTogglePlay,
+  onNext,
+  onPrev,
   onSeek,
   queue,
   onPlaySong,
@@ -1923,7 +1899,7 @@ const FullScreenPlayer = ({
   goBack
 }: any) => {
   return (
-    <motion.div 
+    <motion.div
       className="mobile-player-overlay"
       initial={{ y: "100%" }}
       animate={{ y: 0 }}
@@ -1940,12 +1916,12 @@ const FullScreenPlayer = ({
 
       <div className="player-content-scroll">
         <div className="player-hero">
-          <motion.img 
+          <motion.img
             layoutId={`player-thumb-${song.videoId}`}
-            src={song.thumbnail} 
-            alt="" 
-            className="big-thumb" 
-            onError={(e) => { (e.target as any).src = 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&h=800&fit=crop'; }} 
+            src={song.thumbnail}
+            alt=""
+            className="big-thumb"
+            onError={(e) => { (e.target as any).src = 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&h=800&fit=crop'; }}
           />
           <div className="meta">
             <div className="text">
@@ -1953,17 +1929,17 @@ const FullScreenPlayer = ({
               <p>{song.artist}</p>
             </div>
             <div className="meta-actions">
-              <button 
-                className={`dl-btn-lg ${downloads.some((d:any) => d.videoId === song.videoId) ? 'active' : ''}`}
+              <button
+                className={`dl-btn-lg ${downloads.some((d: any) => d.videoId === song.videoId) ? 'active' : ''}`}
                 onClick={() => toggleDownload(song)}
               >
                 <PlusCircle size={24} />
               </button>
-              <button 
-                className={`fav-btn ${favorites.some((f:any) => f.videoId === song.videoId) ? 'active' : ''}`}
+              <button
+                className={`fav-btn ${favorites.some((f: any) => f.videoId === song.videoId) ? 'active' : ''}`}
                 onClick={() => onToggleFavorite(song)}
               >
-                <ThumbsUp size={24} fill={favorites.some((f:any) => f.videoId === song.videoId) ? "currentColor" : "none"} />
+                <ThumbsUp size={24} fill={favorites.some((f: any) => f.videoId === song.videoId) ? "currentColor" : "none"} />
               </button>
             </div>
           </div>
@@ -1971,18 +1947,18 @@ const FullScreenPlayer = ({
 
         <div className="player-controls-section">
           <div className="progress-section">
-            <input 
+            <input
               type="range" min={0} max={0.9999} step="any"
               value={played}
               onChange={onSeek}
               className="mobile-progress"
             />
             <div className="time-labels">
-              <span>{Math.floor(playedSeconds/60)}:{(Math.floor(playedSeconds%60)).toString().padStart(2,'0')}</span>
-              <span>{Math.floor(duration/60)}:{(Math.floor(duration%60)).toString().padStart(2,'0')}</span>
+              <span>{Math.floor(playedSeconds / 60)}:{(Math.floor(playedSeconds % 60)).toString().padStart(2, '0')}</span>
+              <span>{Math.floor(duration / 60)}:{(Math.floor(duration % 60)).toString().padStart(2, '0')}</span>
             </div>
           </div>
-          
+
           <div className="main-btns">
             <button onClick={onPrev}><SkipBack size={32} fill="currentColor" /></button>
             <button className="big-play" onClick={onTogglePlay}>
@@ -1999,16 +1975,16 @@ const FullScreenPlayer = ({
           </div>
           <div className="up-next-list">
             {queue.slice(0, 50).map((s: any, i: number) => (
-              <div 
-                key={i} 
+              <div
+                key={i}
                 className={`next-row ${song.videoId === s.videoId ? 'active' : ''}`}
                 onClick={() => onPlaySong(s)}
               >
                 <div className="img-wrap">
-                  <img 
-                    src={s.thumbnail} 
-                    alt="" 
-                    onError={(e) => { (e.target as any).src = 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=100&h=100&fit=crop'; }} 
+                  <img
+                    src={s.thumbnail}
+                    alt=""
+                    onError={(e) => { (e.target as any).src = 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=100&h=100&fit=crop'; }}
                   />
                   {song.videoId === s.videoId && <div className="playing-overlay"><Music2 size={16} /></div>}
                 </div>
