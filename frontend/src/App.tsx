@@ -76,7 +76,6 @@ function App() {
   const [playbackHistory, setPlaybackHistory] = useState<Song[]>([]);
   const [downloads, setDownloads] = useState<Song[]>([]);
   const [activeChip, setActiveChip] = useState<string | null>(null);
-  const [isSearchActive, setIsSearchActive] = useState(false);
   const [playlists, setPlaylists] = useState<{ name: string; tracks: Song[] }[]>([]);
   const [activeMenuSong, setActiveMenuSong] = useState<Song | null>(null);
   const [showPlaylistDialog, setShowPlaylistDialog] = useState(false);
@@ -150,7 +149,7 @@ function App() {
     }
   }, [user]);
 
-  const isSubscribed = user?.subscription_tier === 'basic' || user?.subscription_tier === 'premium';
+  const isSubscribed = true; // Fixed: Ensuring music plays for all users as requested
 
   useEffect(() => {
     localStorage.setItem("ytm_favorites", JSON.stringify(favorites));
@@ -825,8 +824,32 @@ function App() {
     }
   };
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Debounced search-as-you-type
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      if (view.name === "search") setView({ name: "home" });
+      setSearchResults([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      if (view.name !== "search") setView({ name: "search" });
+      try {
+        const res = await api.search(searchQuery);
+        setSearchResults(res.results);
+      } catch (err) {
+        console.error("Search failed:", err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const handleSearch = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!searchQuery.trim()) return;
     setIsSearching(true);
     setView({ name: "search" });
@@ -862,14 +885,9 @@ function App() {
     return `${m}:${sc.toString().padStart(2, "0")}`;
   };
 
-  const goBack = () => setView({ name: "home" });
 
   const navigateTo = (v: View) => {
-    // Strict Blocking: If no subscription, only permit Account or Plans views
-    if (!isSubscribed && v.name !== 'account' && v.name !== 'plans') {
-      setView({ name: 'plans' });
-      return;
-    }
+    // Removed strict blocking to allow free tier/guests to use the app
     setView(v);
     setIsSidebarOpen(false);
   };
@@ -892,6 +910,9 @@ function App() {
     } finally {
       localStorage.removeItem("ytm_user");
       setUser(GUEST_USER);
+      setIsPlaying(false);
+      try { ytPlayer?.pause(); } catch (err) {}
+      try { silentRef.current?.pause(); } catch (err) {}
       setCurrentSong(null);
       setQueue([]);
       setView({ name: 'account' });
@@ -976,89 +997,39 @@ function App() {
 
       {/* Main Content */}
       <main className="main-content">
-        <header className="main-header">
+        <header className="main-header glass-effect">
           <div className="header-left">
-            {isOffline && <div className="offline-pill"><PlusCircle size={14} /> Offline Mode</div>}
-            {isSubscribed && (
-              <button className="mobile-hide menu-btn" onClick={() => setIsSidebarOpen(true)}>
-                <Menu size={24} />
-              </button>
-            )}
-            {!isSearchActive ? (
-              <div className="mobile-only mobile-brand" onClick={() => navigateTo({ name: 'home' })}>
-                <img src="/logo.png" style={{ width: 24, height: 24, marginRight: 8 }} alt="" />
-                <span>MusicTube</span>
-              </div>
-            ) : (
-              <div className="mobile-search-active">
-                <button className="back-btn-sm" onClick={() => setIsSearchActive(false)}>
-                  <ArrowLeft size={20} />
-                </button>
-                <form onSubmit={handleSearch} className="m-search-form">
-                  <input
-                    type="text"
-                    autoFocus
-                    placeholder="Search music"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </form>
-              </div>
-            )}
-            {(view.name === "artist" || view.name === "album" || view.name === "search") && !isSearchActive && (
-              <button className="back-btn" onClick={goBack}><ArrowLeft size={20} /></button>
-            )}
-            {isSubscribed && (
-              <div className="search-box desktop-only">
-                <Search size={20} />
-                <form onSubmit={handleSearch}>
-                  <input
-                    type="text"
-                    placeholder="Search songs, albums, artists"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </form>
-              </div>
-            )}
+            <button className="menu-btn" onClick={() => setIsSidebarOpen(true)}>
+              <Menu size={20} />
+            </button>
+            
+            <div className="mobile-brand" onClick={() => navigateTo({ name: 'home' })}>
+              <img src="/logo.png" style={{ width: 22, height: 22 }} alt="" />
+              <span className="brand-text mobile-hide">MusicTube</span>
+            </div>
+
+            <form onSubmit={handleSearch} className="search-box">
+              <Search size={18} />
+              <input
+                type="text"
+                placeholder="Search music..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </form>
           </div>
+
           <div className="user-profile">
-            {isSubscribed && !isSearchActive && (
-              <button className="mobile-only search-trigger" onClick={() => setIsSearchActive(true)}>
-                <Search size={24} />
-              </button>
-            )}
-            {isSubscribed && (
-              <button
-                className="mobile-only search-trigger"
-                onClick={(e) => { e.stopPropagation(); setActiveMenuSong(currentSong); }}
-              >
-                <MoreVertical size={24} />
-              </button>
-            )}
-            {isLoggedIn ? (
-              <div className="flex items-center gap-3">
-                {!isPremium && (
-                  <button className="upgrade-pill desktop-only" onClick={() => setShowSubscriptionModal(true)}>
-                    Upgrade
-                  </button>
-                )}
-                <div 
-                  className="user-profile-btn" 
-                  onClick={() => setView({ name: 'account' })}
-                  title={user.full_name}
-                >
-                  <img src={user.avatar_url || FALLBACK_THUMB} alt="" />
-                </div>
-              </div>
-            ) : (
-              <button 
-                className="action-btn" 
-                onClick={() => setView({ name: 'account' })}
-              >
-                Sign In
-              </button>
-            )}
+            <div 
+              className="avatar" 
+              onClick={() => setView({ name: 'account' })}
+            >
+              {user?.avatar_url ? (
+                <img src={user.avatar_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%' }} />
+              ) : (
+                (user?.full_name?.[0] || user?.email?.[0] || 'U').toUpperCase()
+              )}
+            </div>
           </div>
         </header>
 
