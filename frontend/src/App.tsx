@@ -590,67 +590,42 @@ const triggerAutoPlayExtension = async (lastSong: Song) => {
 };
   
   const handleNext = async () => {
-    const q = queueRef.current;
-    
-    if (q.length === 0) {
-      if (currentSongRef.current && autoPlay) {
-        triggerAutoPlayExtension(currentSongRef.current);
-      }
-      return;
-    }
-    
-    // Repeat One logic: restart and force play
-    if (repeatMode === 'one' && currentSongRef.current) {
-      ytPlayer.seekTo(0);
-      ytPlayer.play();
-      setIsPlaying(true);
-      return;
-    }
+  const q = queueRef.current;
+  if (q.length === 0) return;
 
-    const currentIdx = q.findIndex((s) => s.videoId === currentSongRef.current?.videoId);
-    let nextIdx = currentIdx + 1;
+  // 1. Handle Repeat One
+  if (repeatMode === 'one' && currentSongRef.current) {
+    ytPlayer.seekTo(0);
+    setIsPlaying(true);
+    return;
+  }
 
-    // Advanced Navigation: Shuffle & Repeat All
-    if (isShuffle) {
-      nextIdx = Math.floor(Math.random() * q.length);
-      if (nextIdx === currentIdx && q.length > 1) nextIdx = (nextIdx + 1) % q.length;
-    } else if (nextIdx >= q.length) {
-      if (repeatMode === 'all') {
-        nextIdx = 0;
-      } else if (autoPlay) {
-        // Fetch next songs from the API automatically
-        const lastSong = q[q.length - 1] || currentSongRef.current;
-        if (lastSong) {
-          triggerAutoPlayExtension(lastSong);
-        }
-        return;
-      } else {
-        setIsPlaying(false);
-        return;
-      }
-    }
-    
-    const nextSong = q[nextIdx];
-    if (!nextSong) return;
+  const currentIdx = q.findIndex((s) => s.videoId === currentSongRef.current?.videoId);
+  let nextIdx = currentIdx + 1;
 
-    // Force restart if it's the same song ID (common in small queues)
-    if (nextSong.videoId === currentSongRef.current?.videoId) {
-      ytPlayer.seekTo(0);
-      ytPlayer.play();
-      setIsPlaying(true);
+  // 2. Navigation Logic
+  if (isShuffle) {
+    nextIdx = Math.floor(Math.random() * q.length);
+  } else if (nextIdx >= q.length) {
+    if (repeatMode === 'all') {
+      nextIdx = 0;
+    } else if (autoPlay) {
+      // If we hit the end, fetch new recommendations immediately
+      await triggerAutoPlayExtension(q[q.length - 1]);
+      return; 
     } else {
-      setCurrentSong(nextSong);
-      setIsPlaying(true);
+      setIsPlaying(false);
+      return;
     }
+  }
 
-    // Proactive AI Radio Extension: Generate more songs BEFORE the queue ends
-    if (autoPlay && nextIdx >= q.length - 3) {
-      const lastSong = q[q.length - 1] || currentSongRef.current;
-      if (lastSong) {
-        triggerAutoPlayExtension(lastSong);
-      }
-    }
-  };
+  // 3. Proactive Fetching: If we are 3 songs from the end, get more songs NOW
+  if (autoPlay && nextIdx >= q.length - 3) {
+    triggerAutoPlayExtension(q[nextIdx]);
+  }
+
+  setCurrentSong(q[nextIdx]);
+};
 
   
   // Always keep the ref pointing at the latest handleNext
