@@ -106,48 +106,66 @@ function App() {
     };
   }, []);
   useEffect(() => {
-    const savedFavs = localStorage.getItem("ytm_favorites");
-    const savedDLs = localStorage.getItem("ytm_downloads");
-    const savedPlaylists = localStorage.getItem("ytm_playlists");
-    const savedSong = localStorage.getItem("ytm_currentSong");
-    const savedView = localStorage.getItem("ytm_view");
+    const hydrate = async () => {
+      const savedFavs = localStorage.getItem("ytm_favorites");
+      const savedDLs = localStorage.getItem("ytm_downloads");
+      const savedPlaylists = localStorage.getItem("ytm_playlists");
+      const savedSong = localStorage.getItem("ytm_currentSong");
+      const savedView = localStorage.getItem("ytm_view");
 
-    try {
-      if (savedFavs) setFavorites(JSON.parse(savedFavs));
-      if (savedDLs) setDownloads(JSON.parse(savedDLs));
-      if (savedPlaylists) setPlaylists(JSON.parse(savedPlaylists));
-      if (savedSong) setCurrentSong(JSON.parse(savedSong));
-
-      // Load user and subscription state
-      const storedUser = localStorage.getItem("ytm_user");
-      if (storedUser) {
-        const u = JSON.parse(storedUser);
-        if (savedView) {
-          try {
-            const parsed = JSON.parse(savedView);
-            // Don't restore plan/account views on refresh
-            if (parsed.name !== 'plans' && parsed.name !== 'account') {
-              setView(parsed);
-            } else {
-              setView({ name: 'home' });
-            }
-          } catch {
-            setView({ name: 'home' });
+      try {
+        if (savedFavs) setFavorites(JSON.parse(savedFavs));
+        if (savedDLs) setDownloads(JSON.parse(savedDLs));
+        if (savedPlaylists) setPlaylists(JSON.parse(savedPlaylists));
+        if (savedSong) setCurrentSong(JSON.parse(savedSong));
+        
+        // ── SYNC WITH SUPABASE (REAL-TIME PLAN CHECK) ──
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user) {
+          const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+          if (profile) {
+            const userObj = {
+              id: session.user.id,
+              email: session.user.email,
+              full_name: profile.full_name,
+              avatar_url: profile.avatar_url || '',
+              subscription_tier: profile.subscription_tier || 'free'
+            };
+            setUser(userObj);
+            localStorage.setItem('ytm_user', JSON.stringify(userObj));
+            
+            // View management
+            if (userObj.subscription_tier === 'free') {
+               setView({ name: 'plans' });
+            } else if (savedView) {
+               try {
+                 const parsed = JSON.parse(savedView);
+                 if (parsed.name !== 'plans' && parsed.name !== 'account') setView(parsed);
+                 else setView({ name: 'home' });
+               } catch { setView({ name: 'home' }); }
+            } else { setView({ name: 'home' }); }
           }
         } else {
-          setView({ name: 'home' });
+          // Fallback to local user
+          const storedUser = localStorage.getItem("ytm_user");
+          if (storedUser) {
+            const u = JSON.parse(storedUser);
+            setUser(u);
+            if (savedView) {
+              try { setView(JSON.parse(savedView)); } catch { setView({ name: 'account' }); }
+            } else { setView({ name: 'account' }); }
+          } else {
+            setView({ name: 'account' });
+          }
         }
-        if (!u.subscription_tier && !u.isGuest) {
-          setView({ name: 'plans' });
-        }
-      } else {
+      } catch (e) {
+        console.warn("Storage hydration failed:", e);
         setView({ name: 'account' });
       }
-    } catch (e) {
-      console.warn("Storage hydration failed:", e);
-      setView({ name: 'account' });
-    }
-  }, [user]);
+    };
+    hydrate();
+  }, []);
 
   const isSubscribed = user && !user.isGuest && (user.subscription_tier === 'premium' || user.subscription_tier === 'basic');
 
