@@ -2,7 +2,7 @@
  * useYouTubePlayer – wraps the YouTube IFrame API directly.
  * Improved for stability and control responsive-ness.
  */
-import { useEffect, useRef, useCallback, useMemo } from "react";
+import { useEffect, useRef, useCallback } from "react";
 
 declare global {
   interface Window {
