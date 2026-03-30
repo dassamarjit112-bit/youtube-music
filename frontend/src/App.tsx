@@ -1105,10 +1105,18 @@ function App() {
                   <Search size={18} />
                   <input
                     type="text"
-                    placeholder="Search music..."
+                    placeholder={isRecording ? "Listening..." : "Search music..."}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
+                  {isRecording && (
+                    <div className="voice-animation">
+                      <div className="voice-bar"></div>
+                      <div className="voice-bar"></div>
+                      <div className="voice-bar"></div>
+                      <div className="voice-bar"></div>
+                    </div>
+                  )}
                   <button 
                     type="button" 
                     className={`mic-btn ${isRecording ? 'recording' : ''}`} 
