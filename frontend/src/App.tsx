@@ -194,11 +194,20 @@ function App() {
   const ytPlayer = useYouTubePlayer("yt-player-container", {
     onStateChange: (state) => {
       // YT.PlayerState: -1=unstarted, 0=ended, 1=playing, 2=paused, 3=buffering, 5=cued
-      if (state === 1) setIsPlaying(true);
-      else if (state === 2) setIsPlaying(false);
-      else if ((state === -1 || state === 5) && isPlayingRef.current) {
-         // Auto-play bridging: IFrame API often gets "stuck" unstarted/cued on mobile track changes.
-         setTimeout(() => ytPlayer.play(), 100);
+      if (state === 1) {
+        setIsPlaying(true);
+        setPlayerError(null);
+      } else if (state === 2) {
+        setIsPlaying(false);
+      } else if (state === 0) {
+        // Track ended
+        setIsPlaying(false);
+        handleNextRef.current();
+      } else if ((state === -1 || state === 5 || state === 3) && isPlayingRef.current) {
+         // Auto-play bridging: IFrame API often gets "stuck" unstarted/cued/buffering on mobile track changes.
+         setTimeout(() => {
+           if (isPlayingRef.current) ytPlayer.play();
+         }, 300);
       }
     },
     onProgress: (p, secs) => {
@@ -581,42 +590,67 @@ const triggerAutoPlayExtension = async (lastSong: Song) => {
 };
   
   const handleNext = async () => {
-  const q = queueRef.current;
-  if (q.length === 0) return;
-
-  const currentIdx = q.findIndex((s) => s.videoId === currentSongRef.current?.videoId);
-  let nextIdx = currentIdx + 1;
-
-  // 1. Logic for Shuffle
-  if (isShuffle) {
-    nextIdx = Math.floor(Math.random() * q.length);
-  } 
-  
-  // 2. Logic for reaching the end of the manual queue
-  if (nextIdx >= q.length) {
-    if (repeatMode === 'all') {
-      nextIdx = 0;
-    } else if (autoPlay) {
-      // THIS IS THE FORCE: Fetch next songs from the API automatically
-      const lastSong = q[q.length - 1];
-      await triggerAutoPlayExtension(lastSong);
-      return; 
-    } else {
-      setIsPlaying(false);
+    const q = queueRef.current;
+    
+    if (q.length === 0) {
+      if (currentSongRef.current && autoPlay) {
+        triggerAutoPlayExtension(currentSongRef.current);
+      }
       return;
     }
-  }
+    
+    // Repeat One logic: restart and force play
+    if (repeatMode === 'one' && currentSongRef.current) {
+      ytPlayer.seekTo(0);
+      ytPlayer.play();
+      setIsPlaying(true);
+      return;
+    }
 
-  // 3. Set the song and force play
-  const nextSong = q[nextIdx];
-  setCurrentSong(nextSong);
-  setIsPlaying(true);
+    const currentIdx = q.findIndex((s) => s.videoId === currentSongRef.current?.videoId);
+    let nextIdx = currentIdx + 1;
 
-  // 4. Proactive Fetching: If we are near the end, get more songs NOW
-  if (autoPlay && nextIdx >= q.length - 3) {
-    triggerAutoPlayExtension(nextSong);
-  }
-};
+    // Advanced Navigation: Shuffle & Repeat All
+    if (isShuffle) {
+      nextIdx = Math.floor(Math.random() * q.length);
+      if (nextIdx === currentIdx && q.length > 1) nextIdx = (nextIdx + 1) % q.length;
+    } else if (nextIdx >= q.length) {
+      if (repeatMode === 'all') {
+        nextIdx = 0;
+      } else if (autoPlay) {
+        // Fetch next songs from the API automatically
+        const lastSong = q[q.length - 1] || currentSongRef.current;
+        if (lastSong) {
+          triggerAutoPlayExtension(lastSong);
+        }
+        return;
+      } else {
+        setIsPlaying(false);
+        return;
+      }
+    }
+    
+    const nextSong = q[nextIdx];
+    if (!nextSong) return;
+
+    // Force restart if it's the same song ID (common in small queues)
+    if (nextSong.videoId === currentSongRef.current?.videoId) {
+      ytPlayer.seekTo(0);
+      ytPlayer.play();
+      setIsPlaying(true);
+    } else {
+      setCurrentSong(nextSong);
+      setIsPlaying(true);
+    }
+
+    // Proactive AI Radio Extension: Generate more songs BEFORE the queue ends
+    if (autoPlay && nextIdx >= q.length - 3) {
+      const lastSong = q[q.length - 1] || currentSongRef.current;
+      if (lastSong) {
+        triggerAutoPlayExtension(lastSong);
+      }
+    }
+  };
 
   
   // Always keep the ref pointing at the latest handleNext
@@ -661,7 +695,12 @@ const triggerAutoPlayExtension = async (lastSong: Song) => {
       return;
     }
 
+    if (song.videoId === currentSongRef.current?.videoId) {
+      ytPlayer.seekTo(0);
+      ytPlayer.play();
+    }
     setCurrentSong(song);
+    setIsPlaying(true);
     setPlayed(0);
     setPlayedSeconds(0);
     setDuration(0);
