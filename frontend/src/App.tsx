@@ -588,30 +588,26 @@ const triggerAutoPlayExtension = async (lastSong: Song) => {
     console.error("Auto-play extension failed:", e);
   }
 };
-  
-  const handleNext = async () => {
+ const handleNext = async () => {
   const q = queueRef.current;
   if (q.length === 0) return;
-
-  // 1. Handle Repeat One
-  if (repeatMode === 'one' && currentSongRef.current) {
-    ytPlayer.seekTo(0);
-    setIsPlaying(true);
-    return;
-  }
 
   const currentIdx = q.findIndex((s) => s.videoId === currentSongRef.current?.videoId);
   let nextIdx = currentIdx + 1;
 
-  // 2. Navigation Logic
+  // 1. Logic for Shuffle
   if (isShuffle) {
     nextIdx = Math.floor(Math.random() * q.length);
-  } else if (nextIdx >= q.length) {
+  } 
+  
+  // 2. Logic for reaching the end of the manual queue
+  if (nextIdx >= q.length) {
     if (repeatMode === 'all') {
       nextIdx = 0;
     } else if (autoPlay) {
-      // If we hit the end, fetch new recommendations immediately
-      await triggerAutoPlayExtension(q[q.length - 1]);
+      // THIS IS THE FORCE: Fetch next songs from the API automatically
+      const lastSong = q[q.length - 1];
+      await triggerAutoPlayExtension(lastSong);
       return; 
     } else {
       setIsPlaying(false);
@@ -619,12 +615,15 @@ const triggerAutoPlayExtension = async (lastSong: Song) => {
     }
   }
 
-  // 3. Proactive Fetching: If we are 3 songs from the end, get more songs NOW
-  if (autoPlay && nextIdx >= q.length - 3) {
-    triggerAutoPlayExtension(q[nextIdx]);
-  }
+  // 3. Set the song and force play
+  const nextSong = q[nextIdx];
+  setCurrentSong(nextSong);
+  setIsPlaying(true);
 
-  setCurrentSong(q[nextIdx]);
+  // 4. Proactive Fetching: If we are near the end, get more songs NOW
+  if (autoPlay && nextIdx >= q.length - 3) {
+    triggerAutoPlayExtension(nextSong);
+  }
 };
 
   
