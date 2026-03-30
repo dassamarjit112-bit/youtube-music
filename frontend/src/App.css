@@ -3758,6 +3758,45 @@ body {
   color: #fff;
 }
 
+.queue-modes button:hover {
+  color: rgba(255, 255, 255, 0.8);
+  transform: scale(1.1);
+}
+
+/* Refresh Queue button */
+.refresh-queue-btn {
+  color: #666;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 0.2s, transform 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 6px;
+}
+
+.refresh-queue-btn:hover:not(:disabled) {
+  color: rgba(255, 255, 255, 0.9) !important;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.refresh-queue-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+@keyframes spin-cw {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.refresh-queue-btn.spinning svg {
+  animation: spin-cw 0.7s linear infinite;
+  color: var(--accent-red);
+}
+
 .player-queue-list {
   flex: 1;
   overflow-y: auto;
@@ -3806,6 +3845,64 @@ body {
 
 .q-playing-icon {
   color: var(--accent-red);
+}
+
+.q-num {
+  font-size: 12px;
+  color: var(--text-dim);
+  min-width: 20px;
+  text-align: right;
+}
+
+/* ── Player Mode Strip (bottom controls) ── */
+.player-mode-strip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.mode-btn {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.4);
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.mode-btn:hover:not(:disabled) {
+  color: rgba(255,255,255,0.9);
+  background: rgba(255,255,255,0.07);
+}
+
+.mode-btn.active {
+  color: var(--accent-red) !important;
+  background: rgba(255, 30, 20, 0.1);
+}
+
+.mode-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.mode-btn.spinning svg {
+  animation: spin-cw 0.8s linear infinite;
+}
+
+.mode-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 /* ── PLAYER FLOATING UI ── */
@@ -4390,6 +4487,26 @@ body {
   margin-bottom: 16px;
 }
 
+.refresh-mobile-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: #fff;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin-left: 8px;
+  transition: all 0.2s;
+}
+
+.refresh-mobile-btn:active {
+  transform: scale(0.9);
+  background: rgba(255, 255, 255, 0.15);
+}
+
 .tier-badge {
   display: inline-flex;
   align-items: center;
@@ -4535,5 +4652,58 @@ body {
   font-weight: 700;
   cursor: pointer;
   margin-top: 40px;
+}
+
+/* --- ANIMATIONS --- */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+.eq-anim {
+  animation: eq 0.6s ease-in-out infinite alternate;
+}
+@keyframes eq {
+  0% { transform: scaleY(0.5); }
+  100% { transform: scaleY(1.3); }
+}
+
+/* Better player mode buttons */
+.mode-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: none;
+  color: var(--text-secondary);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.mode-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.mode-btn.active {
+  background: var(--accent-red-dim);
+  color: var(--accent-red);
+}
+
+.mode-label {
+  position: absolute;
+  bottom: -18px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
 }
 

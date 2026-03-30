@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useRef } from "react";
 import {
-  Play, Pause, SkipBack, SkipForward, Shuffle, Repeat,
+  Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1,
   Volume2, ThumbsUp, MoreVertical, Search, Download, Mic,
-  Home, Compass, Library, PlusCircle, ArrowLeft, Music2, Menu, ShieldCheck, Lock, Shield
+  Home, Compass, Library, PlusCircle, ArrowLeft, Music2, Menu, ShieldCheck, Lock, Shield,
+  RefreshCw
 } from "lucide-react";
 import { api } from "./api";
 import type { Song, HomeSection, SearchResult, ArtistDetail, AlbumDetail } from "./api";
@@ -71,6 +72,7 @@ function App() {
   const [repeatMode, setRepeatMode] = useState<'none' | 'all' | 'one'>('none');
   const [autoPlay, setAutoPlay] = useState(true);
   const [showFloatingControls, setShowFloatingControls] = useState(false);
+  const [isRefreshingQueue, setIsRefreshingQueue] = useState(false);
 
   useEffect(() => {
     const hOnline = () => setIsOffline(false);
@@ -180,25 +182,45 @@ function App() {
 
   const staticCurrentSongId = useRef<string | null>(null);
   const handleNextRef = useRef<() => void>(() => { });
+  const repeatModeRef = useRef(repeatMode);
+  const isShuffleRef = useRef(isShuffle);
+  repeatModeRef.current = repeatMode;
+  isShuffleRef.current = isShuffle;
 
   const handleNext = async () => {
     const q = queueRef.current;
     if (q.length === 0) return;
 
+    // ── Use REFS so the closure is never stale ──
+    const currentRepeatMode = repeatModeRef.current;
+    const currentIsShuffle = isShuffleRef.current;
+
+    // 0. Repeat ONE — force restart the current song
+    if (currentRepeatMode === 'one' && currentSongRef.current) {
+      // Use load instead of seekTo for more robust restart on all devices
+      ytPlayer.load(currentSongRef.current.videoId);
+      setIsPlaying(true);
+      return;
+    }
+
     const currentIdx = q.findIndex((s) => s.videoId === currentSongRef.current?.videoId);
     let nextIdx = currentIdx + 1;
 
-    // 1. Logic for Shuffle
-    if (isShuffle) {
-      nextIdx = Math.floor(Math.random() * q.length);
+    // 1. Shuffle — pick a truly random song (different from current)
+    if (currentIsShuffle && q.length > 1) {
+      let rand = Math.floor(Math.random() * q.length);
+      // Avoid picking the same song if possible
+      while (rand === currentIdx) {
+        rand = Math.floor(Math.random() * q.length);
+      }
+      nextIdx = rand;
     }
 
-    // 2. Logic for reaching the end of the manual queue
-    if (nextIdx >= q.length) {
-      if (repeatMode === 'all') {
+    // 2. End of queue
+    if (nextIdx >= q.length || nextIdx < 0) {
+      if (currentRepeatMode === 'all' && q.length > 0) {
         nextIdx = 0;
-      } else if (autoPlay) {
-        // THIS IS THE FORCE: Fetch next songs from the API automatically
+      } else if (autoPlay && currentSongRef.current) {
         const lastSong = q[q.length - 1];
         await triggerAutoPlayExtension(lastSong);
         return;
@@ -208,12 +230,12 @@ function App() {
       }
     }
 
-    // 3. Set the song and force play
+    // 3. Play the next song
     const nextSong = q[nextIdx];
     setCurrentSong(nextSong);
     setIsPlaying(true);
 
-    // 4. Proactive Fetching: If we are near the end, get more songs NOW
+    // 4. Proactive Fetching: near end → fetch more
     if (autoPlay && nextIdx >= q.length - 3) {
       triggerAutoPlayExtension(nextSong);
     }
@@ -228,11 +250,17 @@ function App() {
       return;
     }
     const q = queueRef.current;
+    const currentRepeatMode = repeatModeRef.current;
     const currentIdx = q.findIndex((s) => s.videoId === currentSongRef.current?.videoId);
     if (currentIdx > 0) {
       setCurrentSong(q[currentIdx - 1]);
-    } else if (repeatMode === 'all' && q.length > 0) {
+      setIsPlaying(true);
+    } else if (currentRepeatMode === 'all' && q.length > 0) {
       setCurrentSong(q[q.length - 1]);
+      setIsPlaying(true);
+    } else {
+      // Already at start, just restart
+      ytPlayer.seekTo(0);
     }
   };
 
@@ -343,9 +371,15 @@ function App() {
       if (state === 1 || state === 3) {
         setIsPlaying(true);
         setPlayerError(null);
-      } else if (state === 2 || state === 0) {
-        setIsPlaying(false);
-        if (state === 0) handleNextRef.current();
+      } else if (state === 2) {
+        // Only set paused if we didn't intend to play
+        if (isPlayingRef.current === false) setIsPlaying(false);
+      } else if (state === 0) {
+        // Song ended — if repeat one, DON'T set isPlaying=false; handleNext will restart
+        if (repeatModeRef.current !== 'one') {
+          setIsPlaying(false);
+        }
+        handleNextRef.current();
       } else if (state === -1 && isPlayingRef.current) {
         // Only bridge from UNSTARTED to prevent cued state loops
         setTimeout(() => {
@@ -935,26 +969,58 @@ function App() {
     }
 
     const recognition = new SpeechRecognition();
-    recognition.lang = ""; // Auto-detect
+    // Support multiple languages — browser picks best match from user's locale
+    recognition.lang = navigator.language || 'en-US';
+    recognition.continuous = false;
     recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
+    recognition.maxAlternatives = 3;
 
     recognition.onstart = () => {
       setIsRecording(true);
     };
 
     recognition.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript;
+      const transcript = event.results[0][0].transcript.trim();
+      if (!transcript) return;
+
+      setIsRecording(false);
+      
+      // 1. Update UI and Search Query
       setSearchQuery(transcript);
-      // The useEffect for searchQuery will trigger search automatically via debounce
+      setView({ name: 'search' });
+      setIsSearching(true);
+      setSearchResults([]);
+
+      // 2. Mark voice search as active so debounce doesn't duplicate the search
+      isVoiceSearchActiveRef.current = true;
+
+      // 3. Fire search immediately (don't wait for debounce)
+      api.search(transcript)
+        .then((res) => {
+          console.log("Voice Search Results:", res.results);
+          if (res.results && res.results.length > 0) {
+            setSearchResults(res.results);
+          } else {
+            console.warn("Voice search returned no results for:", transcript);
+          }
+        })
+        .catch((err) => {
+          console.error('Voice search API failure:', err);
+          setSearchResults([]);
+        })
+        .finally(() => setIsSearching(false));
     };
 
     recognition.onerror = (event: any) => {
       console.error("Speech recognition error:", event.error);
-      if (event.error === 'not-allowed') {
-        alert("Microphone permission denied. Please enable it in browser settings.");
-      }
       setIsRecording(false);
+      if (event.error === 'not-allowed') {
+        alert("Microphone permission denied. Please enable microphone access in your browser settings.");
+      } else if (event.error === 'no-speech') {
+        // silently ignore — user just didn't speak
+      } else {
+        alert(`Voice search error: ${event.error}. Try again.`);
+      }
     };
 
     recognition.onend = () => {
@@ -962,6 +1028,33 @@ function App() {
     };
 
     recognition.start();
+  };
+
+  // ── Refresh Queue: generate a fresh set of related songs ──
+  const handleRefreshQueue = async () => {
+    if (!currentSongRef.current || isRefreshingQueue) return;
+    setIsRefreshingQueue(true);
+    try {
+      const seed = currentSongRef.current;
+      const res = await api.watch(seed.videoId);
+      let tracks = (res.tracks || []) as Song[];
+      // Shuffle them for variety
+      for (let i = tracks.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [tracks[i], tracks[j]] = [tracks[j], tracks[i]];
+      }
+      // Keep the current song at top, then new tracks
+      const filtered = tracks.filter(t => t.videoId !== seed.videoId);
+      const freshQueue = [seed, ...filtered.slice(0, 50)];
+      setQueue(freshQueue);
+      
+      // If we are on player page, notify user? Maybe just let state update.
+      console.log("Queue refreshed with", filtered.length, "songs.");
+    } catch (e) {
+      console.error('Refresh queue failed:', e);
+    } finally {
+      setIsRefreshingQueue(false);
+    }
   };
 
   const fetchAlbum = async (id: string) => {
@@ -978,10 +1071,20 @@ function App() {
   };
 
   // Debounced search-as-you-type
+  // Note: voice search fires API immediately and sets isSearching=true; this debounce
+  // will fire after 500ms but isSearching guard prevents double-loading UX flicker.
+  const isVoiceSearchActiveRef = useRef(false);
   useEffect(() => {
     if (!searchQuery.trim()) {
       if (view.name === "search") setView({ name: "home" });
       setSearchResults([]);
+      isVoiceSearchActiveRef.current = false;
+      return;
+    }
+
+    // If voice search already fired an immediate search, skip the debounce this round
+    if (isVoiceSearchActiveRef.current) {
+      isVoiceSearchActiveRef.current = false;
       return;
     }
 
@@ -1828,8 +1931,33 @@ function App() {
                       <div className="queue-header-v3">
                         <h3>Up Next</h3>
                         <div className="queue-modes">
-                          <button className={isShuffle ? 'active' : ''} onClick={handleShuffleToggle}><Shuffle size={18} /></button>
-                          <button className={repeatMode !== 'none' ? 'active' : ''} onClick={handleRepeatToggle}><Repeat size={18} /> {repeatMode === 'one' && '1'}</button>
+                          <button
+                            className={isShuffle ? 'active' : ''}
+                            onClick={handleShuffleToggle}
+                            title="Shuffle"
+                          >
+                            <Shuffle size={18} />
+                          </button>
+                          <button
+                            className={`mode-btn ${repeatMode !== 'none' ? 'active' : ''}`}
+                            onClick={handleRepeatToggle}
+                            title={repeatMode === 'none' ? 'Repeat off' : repeatMode === 'all' ? 'Repeat all' : 'Repeat one'}
+                          >
+                            {repeatMode === 'one' ? (
+                              <div style={{ position: 'relative' }}>
+                                <Repeat size={18} />
+                                <span className="repeat-one-indicator">1</span>
+                              </div>
+                            ) : <Repeat size={18} />}
+                          </button>
+                          <button
+                            className={`refresh-queue-btn ${isRefreshingQueue ? 'spinning' : ''}`}
+                            onClick={handleRefreshQueue}
+                            title="Refresh queue with new music"
+                            disabled={isRefreshingQueue}
+                          >
+                            <RefreshCw size={18} />
+                          </button>
                         </div>
                       </div>
                       <div className="player-queue-list">
@@ -1837,31 +1965,32 @@ function App() {
                           <div
                             key={i}
                             className={`q-row-v3 ${s.videoId === currentSong.videoId ? 'active' : ''}`}
-                            onClick={() => setCurrentSong(s)}
+                            onClick={() => playSong(s)}
                           >
                             <img src={s.thumbnail} alt="" onError={(e) => { (e.target as any).src = FALLBACK_THUMB; }} />
                             <div className="q-info">
                               <p className="q-title">{s.title}</p>
                               <p className="q-artist">{s.artist}</p>
                             </div>
-                            {s.videoId === currentSong.videoId && <div className="q-playing-icon"><Music2 size={16} /></div>}
+                            {s.videoId === currentSong.videoId 
+                              ? <div className="q-playing-icon"><Music2 size={16} className={isPlaying ? 'eq-anim' : ''} /></div>
+                              : <div className="q-num">{i + 1}</div>
+                            }
                           </div>
                         ))}
 
-                        {autoPlay && (
-                          <div className="auto-play-indicator">
-                            <div className="ap-header">
-                              <span>Autoplay is on</span>
-                              <button
-                                className={`ap-toggle ${autoPlay ? 'active' : ''}`}
-                                onClick={() => setAutoPlay(!autoPlay)}
-                              >
-                                <div className="ap-dot" />
-                              </button>
-                            </div>
-                            <p className="ap-desc">Similar songs will play automatically</p>
+                        <div className="auto-play-indicator">
+                          <div className="ap-header">
+                            <span>Autoplay</span>
+                            <button
+                              className={`ap-toggle ${autoPlay ? 'active' : ''}`}
+                              onClick={() => setAutoPlay(!autoPlay)}
+                            >
+                              <div className="ap-dot" />
+                            </button>
                           </div>
-                        )}
+                          <p className="ap-desc">{autoPlay ? 'Similar songs will play automatically' : 'Autoplay is off'}</p>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1869,6 +1998,33 @@ function App() {
                   {/* Floating Bottom Controls for Player View */}
                   <div className="player-floating-bottom">
                     <div className="player-controls-pill">
+                      <div className="player-mode-strip">
+                        <button
+                          className={`mode-btn ${isShuffle ? 'active' : ''}`}
+                          onClick={handleShuffleToggle}
+                          title={isShuffle ? 'Shuffle On' : 'Shuffle Off'}
+                        >
+                          <Shuffle size={18} />
+                          {isShuffle && <span className="mode-label">Shuffle</span>}
+                        </button>
+                        <button
+                          className={`mode-btn ${repeatMode !== 'none' ? 'active' : ''}`}
+                          onClick={handleRepeatToggle}
+                          title={repeatMode === 'none' ? 'Repeat Off' : repeatMode === 'all' ? 'Repeat All' : 'Repeat One'}
+                        >
+                          {repeatMode === 'one' ? <Repeat1 size={18} /> : <Repeat size={18} />}
+                          {repeatMode !== 'none' && <span className="mode-label">{repeatMode === 'one' ? 'One' : 'All'}</span>}
+                        </button>
+                        <button
+                          className={`mode-btn ${isRefreshingQueue ? 'spinning' : ''}`}
+                          onClick={handleRefreshQueue}
+                          title="Refresh Queue"
+                          disabled={isRefreshingQueue}
+                        >
+                          <RefreshCw size={18} />
+                          {isRefreshingQueue && <span className="mode-label">Loading...</span>}
+                        </button>
+                      </div>
                       <div className="prog-container-v4">
                         <span className="time">{formatTime(playedSeconds)}</span>
                         <input type="range" min={0} max={0.9999} step="any" value={played} onChange={handleSeek} />
@@ -2152,10 +2308,14 @@ function App() {
               <button
                 className={`icon-btn ${repeatMode !== 'none' ? 'active' : ''}`}
                 onClick={(e) => { e.stopPropagation(); handleRepeatToggle(); }}
-                title={`Repeat ${repeatMode}`}
+                title={repeatMode === 'none' ? 'Repeat off' : repeatMode === 'all' ? 'Repeat all' : 'Repeat one'}
               >
-                <Repeat size={18} />
-                {repeatMode === 'one' && <span className="repeat-one-indicator">1</span>}
+                {repeatMode === 'one' ? (
+                  <div style={{ position: 'relative' }}>
+                    <Repeat size={18} />
+                    <span className="repeat-one-indicator">1</span>
+                  </div>
+                ) : <Repeat size={18} />}
               </button>
             </div>
           </div>
@@ -2207,6 +2367,8 @@ function App() {
             toggleDownload={toggleDownload}
             onShowMenu={setActiveMenuSong}
             goBack={() => setView({ name: 'home' })}
+            isRefreshingQueue={isRefreshingQueue}
+            onRefreshQueue={handleRefreshQueue}
           />
         )}
       </AnimatePresence>
@@ -2241,7 +2403,9 @@ const FullScreenPlayer = ({
   downloads,
   toggleDownload,
   onShowMenu,
-  goBack
+  goBack,
+  isRefreshingQueue,
+  onRefreshQueue
 }: any) => {
   return (
     <motion.div
@@ -2257,6 +2421,13 @@ const FullScreenPlayer = ({
         </button>
         <div className="title">Now Playing</div>
         <button className="more-btn" onClick={() => onShowMenu(song)}><MoreVertical size={24} /></button>
+        <button 
+          className={`refresh-mobile-btn ${isRefreshingQueue ? 'spinning' : ''}`} 
+          onClick={(e) => { e.stopPropagation(); onRefreshQueue(); }}
+          title="Refresh Playlist"
+        >
+          <RefreshCw size={20} />
+        </button>
       </header>
 
       <div className="player-content-scroll">
