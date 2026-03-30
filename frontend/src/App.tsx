@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import {
   Play, Pause, SkipBack, SkipForward, Shuffle, Repeat,
-  Volume2, ThumbsUp, MoreVertical, Search, Download,
+  Volume2, ThumbsUp, MoreVertical, Search, Download, Mic,
   Home, Compass, Library, PlusCircle, ArrowLeft, Music2, Menu, ShieldCheck, Lock, Shield
 } from "lucide-react";
 import { api } from "./api";
@@ -841,6 +841,45 @@ function App() {
     }
   };
 
+  const [isRecording, setIsRecording] = useState(false);
+
+  const startVoiceSearch = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Voice search is not supported in this browser. Please use Chrome.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = ""; // Auto-detect
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      setIsRecording(true);
+    };
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setSearchQuery(transcript);
+      // The useEffect for searchQuery will trigger search automatically via debounce
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error("Speech recognition error:", event.error);
+      if (event.error === 'not-allowed') {
+        alert("Microphone permission denied. Please enable it in browser settings.");
+      }
+      setIsRecording(false);
+    };
+
+    recognition.onend = () => {
+      setIsRecording(false);
+    };
+
+    recognition.start();
+  };
+
   const fetchAlbum = async (id: string) => {
     setIsLoading(true);
     setAlbumData(null);
@@ -943,19 +982,19 @@ function App() {
     } catch (e) {
       console.warn("Supabase signout sync failed, forcing local scrub.", e);
     } finally {
-      // 2. Comprehensive scrub of all known storage keys
-      const keysToClear = [
-        'ytm_user', 'ytm_favorites', 'ytm_downloads', 'ytm_playlists', 
-        'ytm_currentSong', 'ytm_queue', 'ytm_view'
-      ];
-      keysToClear.forEach(k => localStorage.removeItem(k));
+      // 2. Comprehensive scrub of all storage types
+      localStorage.clear();
+      sessionStorage.clear();
       
-      // 3. Clear ANY Supabase-prefixed keys that might linger
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && (key.startsWith('sb-') || key.includes('supabase'))) {
-          localStorage.removeItem(key);
-        }
+      // 3. Clear all Cookies
+      const cookies = document.cookie.split(";");
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i];
+        const eqPos = cookie.indexOf("=");
+        const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+        document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+        // Also try clearing at domain root to be safe
+        document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=" + window.location.hostname;
       }
 
       // 4. Force state reset
@@ -1070,6 +1109,14 @@ function App() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
+                  <button 
+                    type="button" 
+                    className={`mic-btn ${isRecording ? 'recording' : ''}`} 
+                    onClick={startVoiceSearch}
+                    style={{ background: 'none', border: 'none', color: isRecording ? '#ff1e14' : '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0 8px' }}
+                  >
+                    <Mic size={18} />
+                  </button>
                 </form>
               </>
             )}
