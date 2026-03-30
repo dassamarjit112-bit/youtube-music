@@ -97,17 +97,9 @@ function App() {
   }, []);
   useEffect(() => {
     const hydrate = async () => {
-      const savedFavs = localStorage.getItem("ytm_favorites");
-      const savedDLs = localStorage.getItem("ytm_downloads");
-      const savedPlaylists = localStorage.getItem("ytm_playlists");
-      const savedSong = localStorage.getItem("ytm_currentSong");
-      const savedView = localStorage.getItem("ytm_view");
 
       try {
-        if (savedFavs) setFavorites(JSON.parse(savedFavs));
-        if (savedDLs) setDownloads(JSON.parse(savedDLs));
-        if (savedPlaylists) setPlaylists(JSON.parse(savedPlaylists));
-        if (savedSong) setCurrentSong(JSON.parse(savedSong));
+        // Hydration now relies on Supabase Sync
         
         // ── SYNC WITH SUPABASE (THE ONLY SOURCE OF TRUTH) ──
         const { data: { session } } = await supabase.auth.getSession();
@@ -127,12 +119,6 @@ function App() {
             // View management
             if (userObj.subscription_tier === 'free') {
                setView({ name: 'plans' });
-            } else if (savedView) {
-               try {
-                 const parsed = JSON.parse(savedView);
-                 if (parsed.name !== 'plans' && parsed.name !== 'account') setView(parsed);
-                 else setView({ name: 'home' });
-               } catch { setView({ name: 'home' }); }
             } else { setView({ name: 'home' }); }
           }
         } else {
@@ -149,12 +135,8 @@ function App() {
   const isSubscribed = user && !user.isGuest && (user.subscription_tier === 'premium' || user.subscription_tier === 'basic');
 
   useEffect(() => {
-    localStorage.setItem("ytm_favorites", JSON.stringify(favorites));
-    localStorage.setItem("ytm_downloads", JSON.stringify(downloads));
-    localStorage.setItem("ytm_playlists", JSON.stringify(playlists));
-    if (currentSong) localStorage.setItem("ytm_currentSong", JSON.stringify(currentSong));
-    localStorage.setItem("ytm_queue", JSON.stringify(queue));
-    localStorage.setItem("ytm_view", JSON.stringify(view));
+    // LocalStorage persistence REMOVED per user request
+    // All persistence is now managed via Supabase or Session only
   }, [favorites, downloads, playlists, currentSong, queue, view]);
 
   const silentRef = useRef<HTMLAudioElement | null>(null);

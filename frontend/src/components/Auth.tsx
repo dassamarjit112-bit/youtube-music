@@ -74,7 +74,6 @@ export function Auth({ onLogin }: AuthProps) {
           avatar_url: profile?.avatar_url || '',
           subscription_tier: profile?.subscription_tier || 'free'
         };
-        localStorage.setItem('ytm_user', JSON.stringify(userObj));
         onLogin(userObj);
       }
     } catch (err: any) {
