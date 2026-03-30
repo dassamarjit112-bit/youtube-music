@@ -139,7 +139,7 @@ export function useYouTubePlayer(
     };
   }, [stopProgress]);
 
-  const load = useCallback(
+  
  const cue = useCallback(
   (videoId: string) => {
     if (!videoId || !isReadyRef.current) return;
