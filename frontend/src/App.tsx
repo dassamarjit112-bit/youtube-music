@@ -149,7 +149,7 @@ function App() {
     }
   }, [user]);
 
-  const isSubscribed = true; // Fixed: Ensuring music plays for all users as requested
+  const isSubscribed = user && !user.isGuest && (user.subscription_tier === 'premium' || user.subscription_tier === 'basic');
 
   useEffect(() => {
     localStorage.setItem("ytm_favorites", JSON.stringify(favorites));
@@ -281,6 +281,11 @@ function App() {
 
   const playSong = async (song: Song, songList?: Song[]) => {
     if (!song.videoId) return;
+
+    if (!isSubscribed) {
+      setShowSubscriptionModal(true);
+      return;
+    }
 
     console.log("▶ Playing:", song.title, "| videoId:", song.videoId);
 
@@ -887,7 +892,11 @@ function App() {
 
 
   const navigateTo = (v: View) => {
-    // Removed strict blocking to allow free tier/guests to use the app
+    if (!isSubscribed && v.name !== 'plans' && v.name !== 'account') {
+      setView({ name: 'plans' });
+      setIsSidebarOpen(false);
+      return;
+    }
     setView(v);
     setIsSidebarOpen(false);
   };
@@ -996,42 +1005,44 @@ function App() {
       )}
 
       {/* Main Content */}
-      <main className="main-content">
-        <header className="main-header glass-effect">
-          <div className="header-left">
-            <button className="menu-btn" onClick={() => setIsSidebarOpen(true)}>
-              <Menu size={20} />
-            </button>
-            
-            <div className="mobile-brand" onClick={() => navigateTo({ name: 'home' })}>
-              <img src="/logo.png" style={{ width: 22, height: 22 }} alt="" />
-              <span className="brand-text mobile-hide">MusicTube</span>
+      <main className={`main-content ${!isSubscribed ? 'full-width-minimal' : ''}`} style={!isSubscribed ? { gridColumn: '1 / -1', gridRow: '1 / -1' } : {}}>
+        {isSubscribed && (
+          <header className="main-header glass-effect">
+            <div className="header-left">
+              <button className="menu-btn" onClick={() => setIsSidebarOpen(true)}>
+                <Menu size={20} />
+              </button>
+              
+              <div className="mobile-brand" onClick={() => navigateTo({ name: 'home' })}>
+                <img src="/logo.png" style={{ width: 22, height: 22 }} alt="" />
+                <span className="brand-text mobile-hide">MusicTube</span>
+              </div>
+
+              <form onSubmit={handleSearch} className="search-box">
+                <Search size={18} />
+                <input
+                  type="text"
+                  placeholder="Search music..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </form>
             </div>
 
-            <form onSubmit={handleSearch} className="search-box">
-              <Search size={18} />
-              <input
-                type="text"
-                placeholder="Search music..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </form>
-          </div>
-
-          <div className="user-profile">
-            <div 
-              className="avatar" 
-              onClick={() => setView({ name: 'account' })}
-            >
-              {user?.avatar_url ? (
-                <img src={user.avatar_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%' }} />
-              ) : (
-                (user?.full_name?.[0] || user?.email?.[0] || 'U').toUpperCase()
-              )}
+            <div className="user-profile">
+              <div 
+                className="avatar" 
+                onClick={() => setView({ name: 'account' })}
+              >
+                {user?.avatar_url ? (
+                  <img src={user.avatar_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%' }} />
+                ) : (
+                  (user?.full_name?.[0] || user?.email?.[0] || 'U').toUpperCase()
+                )}
+              </div>
             </div>
-          </div>
-        </header>
+          </header>
+        )}
 
         <section className="scroll-area">
           <AnimatePresence mode="wait">
