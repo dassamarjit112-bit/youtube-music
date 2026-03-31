@@ -130,6 +130,22 @@ function App() {
         } else {
           setView({ name: 'account' });
         }
+
+        // ─── Playback Resumption: Load last known state ───
+        const lastPlayback = localStorage.getItem('ytm_playback_state');
+        if (lastPlayback) {
+          try {
+            const { song, queue: q, seconds } = JSON.parse(lastPlayback);
+            if (song && song.videoId) {
+              setCurrentSong(song);
+              setQueue(q || [song]);
+              setPlayedSeconds(seconds || 0);
+              // Don't auto-play on load, just restore state
+            }
+          } catch (e) {
+            console.warn("Resumption failed:", e);
+          }
+        }
       } catch (e) {
         console.warn("Storage hydration failed:", e);
         setView({ name: 'account' });
@@ -141,9 +157,33 @@ function App() {
   const isSubscribed = user && !user.isGuest && (user.subscription_tier === 'premium' || user.subscription_tier === 'basic');
 
   useEffect(() => {
-    // LocalStorage persistence REMOVED per user request
-    // All persistence is now managed via Supabase or Session only
-  }, [favorites, downloads, playlists, currentSong, queue, view]);
+    // ─── Playback state Persistence (Foreground Service Persistence) ───
+    const handleUnload = () => {
+      if (currentSongRef.current && currentSongRef.current.videoId) {
+        localStorage.setItem('ytm_playback_state', JSON.stringify({
+          song: currentSongRef.current,
+          queue: queueRef.current,
+          seconds: playedSeconds
+        }));
+      }
+    };
+    window.addEventListener('beforeunload', handleUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleUnload);
+    };
+  }, [playedSeconds]); // Depend on seconds to keep ref fresh if needed, but currentSongRef.current is already stable via useRef updates elsewhere.
+
+  useEffect(() => {
+    // Also save on every song change for robustness 
+    if (currentSong && currentSong.videoId) {
+      localStorage.setItem('ytm_playback_state', JSON.stringify({
+        song: currentSong,
+        queue: queue,
+        seconds: playedSeconds
+      }));
+    }
+  }, [currentSong, queue]);
 
   const silentAudioRef = useRef<HTMLAudioElement | null>(null);
   const wakeLockRef = useRef<any>(null);
@@ -162,7 +202,11 @@ function App() {
 
     if (isPlaying) {
       requestWakeLock();
-      silentAudioRef.current?.play().catch(() => { });
+      if (!silentAudioRef.current) {
+        silentAudioRef.current = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFav7//v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+');
+        silentAudioRef.current.loop = true;
+      }
+      silentAudioRef.current.play().catch(() => { });
     } else {
       if (wakeLockRef.current) {
         wakeLockRef.current.release().then(() => {
@@ -498,8 +542,13 @@ function App() {
     navigator.mediaSession.metadata = new MediaMetadata({
       title: currentSong.title,
       artist: currentSong.artist || "MusicTube",
-      album: "Now Playing",
+      album: currentSong.album || "Now Playing",
       artwork: [
+        { src: currentSong.thumbnail, sizes: '96x96', type: 'image/png' },
+        { src: currentSong.thumbnail, sizes: '128x128', type: 'image/png' },
+        { src: currentSong.thumbnail, sizes: '192x192', type: 'image/png' },
+        { src: currentSong.thumbnail, sizes: '256x256', type: 'image/png' },
+        { src: currentSong.thumbnail, sizes: '384x384', type: 'image/png' },
         { src: currentSong.thumbnail, sizes: '512x512', type: 'image/png' },
       ],
     });
@@ -577,23 +626,22 @@ function App() {
       const notes = await reg.getNotifications({ tag: 'musictube-player' });
       notes.forEach(n => n.close());
 
-      if (isPlaying) {
-        reg.showNotification(currentSong.title, {
-          body: `🎵 ${currentSong.artist} • ${currentSong.album || 'MusicTube'}`,
-          icon: currentSong.thumbnail,
-          image: currentSong.thumbnail, // HERO image for beauty!
-          badge: '/favicon.png',
-          tag: 'musictube-player',
-          silent: true,
-          requireInteraction: true,
-          data: { videoId: currentSong.videoId },
-          actions: [
-            { action: isPlaying ? 'pause' : 'play', title: isPlaying ? '⏸ Pause' : '▶ Play' },
-            { action: 'next', title: '⏭ Next' },
-            { action: 'prev', title: '⏮ Prev' }
-          ]
-        } as any);
-      }
+      // Show notification even if paused for persistence (standard for Foreground Services)
+      reg.showNotification(currentSong.title, {
+        body: `🎵 ${currentSong.artist} • ${currentSong.album || 'MusicTube'}`,
+        icon: currentSong.thumbnail,
+        image: currentSong.thumbnail, // HERO image for beauty!
+        badge: '/favicon.png',
+        tag: 'musictube-player',
+        silent: true,
+        requireInteraction: true,
+        data: { videoId: currentSong.videoId },
+        actions: [
+          { action: isPlaying ? 'pause' : 'play', title: isPlaying ? '⏸ Pause' : '▶ Play' },
+          { action: 'next', title: '⏭ Next' },
+          { action: 'prev', title: '⏮ Prev' }
+        ]
+      } as any);
     };
 
     showSongNotification();
@@ -607,10 +655,17 @@ function App() {
     if (!('serviceWorker' in navigator)) return;
     
     const hMsg = (event: MessageEvent) => {
+      // Direct action from notification or service worker background tasks
       if (event.data?.type === 'notification-action') {
         const action = event.data.action;
-        if (action === 'play') setIsPlaying(true);
-        if (action === 'pause') setIsPlaying(false);
+        if (action === 'play') {
+          setIsPlaying(true);
+          ytPlayer.play();
+        }
+        if (action === 'pause') {
+          setIsPlaying(false);
+          ytPlayer.pause();
+        }
         if (action === 'next') handleNext();
         if (action === 'prev') handlePrev();
       }
@@ -618,7 +673,7 @@ function App() {
 
     navigator.serviceWorker.addEventListener('message', hMsg);
     return () => navigator.serviceWorker.removeEventListener('message', hMsg);
-  }, []); // Stable handlers
+  }, [ytPlayer, handleNext, handlePrev]); // Stable handlers with dependencies
 
 
   // App Session Listener
