@@ -188,7 +188,7 @@ function App() {
   const silentAudioRef = useRef<HTMLAudioElement | null>(null);
   const wakeLockRef = useRef<any>(null);
 
-  // ─── Wake Lock & Background Persistence ───
+  // ─── Wake Lock & Background Persistence (Foreground Service Support) ───
   useEffect(() => {
     const requestWakeLock = async () => {
       try {
@@ -207,6 +207,7 @@ function App() {
         silentAudioRef.current.loop = true;
       }
       silentAudioRef.current.play().catch(() => { });
+      if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "playing";
     } else {
       if (wakeLockRef.current) {
         wakeLockRef.current.release().then(() => {
@@ -214,6 +215,7 @@ function App() {
         });
       }
       silentAudioRef.current?.pause();
+      if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "paused";
     }
   }, [isPlaying]);
 
@@ -238,7 +240,8 @@ function App() {
         setIsPlaying(true);
         setPlayerError(null);
       } else if (state === 2) {
-        if (isPlayingRef.current === false) setIsPlaying(false);
+        // Sync state if player was paused natively or via browser tray
+        setIsPlaying(false);
       } else if (state === 0) {
         if (repeatModeRef.current !== 'one') setIsPlaying(false);
         handleNextRef.current();
@@ -473,25 +476,6 @@ function App() {
       }
     };
     
-    // ─── NATIVE APP BRIDGE (MEDIAN.CO) ───
-    if (typeof window !== 'undefined' && (window as any).median) {
-      const median = (window as any).median;
-      try {
-        if (isPlaying) {
-          median.backgroundAudio.enable();
-          median.screen.setKeepScreenOn(true);
-        } else {
-          median.backgroundAudio.disable();
-          median.screen.setKeepScreenOn(false);
-        }
-      } catch (e) { console.warn("Median Bridge Error:", e); }
-    }
-
-    // Crucial for mobile background continuity
-    if (isPlaying && "mediaSession" in navigator) {
-      navigator.mediaSession.playbackState = "playing";
-    }
-
     document.addEventListener('visibilitychange', handleVisible);
     return () => document.removeEventListener('visibilitychange', handleVisible);
   }, [isPlaying, ytPlayer]);
@@ -604,14 +588,7 @@ function App() {
   }, [currentSong, isPlaying, playedSeconds, duration, handleNext, handlePrev, ytPlayer]); 
 
 
-  // Use silent audio to trick mobile browsers into keeping process alive
-  useEffect(() => {
-    if (isPlaying && currentSong) {
-      silentAudioRef.current?.play().catch(() => { });
-    } else {
-      silentAudioRef.current?.pause();
-    }
-  }, [isPlaying, currentSong]);
+  // (Silent Audio handling consolidated into the main Wake Lock effect above)
 
 
   // ─── Persistent System Notification (Secondary Controls) ───
