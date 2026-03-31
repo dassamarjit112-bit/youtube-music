@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import {
   Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1,
   Volume2, ThumbsUp, MoreVertical, Search, Download, Mic,
@@ -186,6 +186,47 @@ function App() {
   const isShuffleRef = useRef(isShuffle);
   repeatModeRef.current = repeatMode;
   isShuffleRef.current = isShuffle;
+
+  const ytPlayer = useYouTubePlayer("yt-player-container", {
+    onReady: () => setIsPlaying(p => p),
+    onStateChange: (state) => {
+      if (state === 1 || state === 3) {
+        setIsPlaying(true);
+        setPlayerError(null);
+      } else if (state === 2) {
+        if (isPlayingRef.current === false) setIsPlaying(false);
+      } else if (state === 0) {
+        if (repeatModeRef.current !== 'one') setIsPlaying(false);
+        handleNextRef.current();
+      } else if (state === -1 && isPlayingRef.current) {
+        setTimeout(() => { if (isPlayingRef.current) ytPlayer.play(); }, 1000);
+      }
+    },
+    onProgress: (p, secs) => {
+      setPlayed(p);
+      setPlayedSeconds(secs);
+    },
+    onDuration: (d) => setDuration(d),
+    onError: async (code) => {
+      console.error("YouTube player error:", code);
+      if (code === 150 || code === 101) {
+        setPlayerError("Content restricted. Finding alternative...");
+        try {
+          const query = `${currentSong?.title} ${currentSong?.artist} audio`;
+          const { results } = await api.search(query);
+          const choice = (results || []).find((i: any) => i.videoId !== currentSong?.videoId && (i.type === "song" || i.type === "video"));
+          if (choice) {
+            setTimeout(() => { setPlayerError(null); playSong(choice as Song); }, 1000);
+            return;
+          }
+        } catch (e) {
+          console.error("Alternative search failed", e);
+        }
+      }
+      setPlayerError(code === 150 || code === 101 ? "Embedding restricted." : code === 5 ? "HTML5 error." : `Playback error (${code}). Skipping...`);
+      setTimeout(() => { setPlayerError(null); handleNextRef.current(); }, 1000);
+    },
+  });
 
   const handleNext = useCallback(async () => {
     const q = queueRef.current;
@@ -378,73 +419,7 @@ function App() {
     }
   };
 
-  const ytPlayer = useYouTubePlayer("yt-player-container", {
-    onReady: () => {
-      // Force a re-render when player is ready
-      setIsPlaying(p => p);
-    },
-    onStateChange: (state) => {
-      // YT.PlayerState: -1=unstarted, 0=ended, 1=playing, 2=paused, 3=buffering, 5=cued
-      if (state === 1 || state === 3) {
-        setIsPlaying(true);
-        setPlayerError(null);
-      } else if (state === 2) {
-        // Only set paused if we didn't intend to play
-        if (isPlayingRef.current === false) setIsPlaying(false);
-      } else if (state === 0) {
-        // Song ended — if repeat one, DON'T set isPlaying=false; handleNext will restart
-        if (repeatModeRef.current !== 'one') {
-          setIsPlaying(false);
-        }
-        handleNextRef.current();
-      } else if (state === -1 && isPlayingRef.current) {
-        // Only bridge from UNSTARTED to prevent cued state loops
-        setTimeout(() => {
-          if (isPlayingRef.current) ytPlayer.play();
-        }, 1000);
-      }
-    },
-    onProgress: (p, secs) => {
-      setPlayed(p);
-      setPlayedSeconds(secs);
-    },
-    onDuration: (d) => setDuration(d),
-    // Removed onEnded here because it's handled in onStateChange above to avoid double calls
-    onError: async (code) => {
-      console.error("YouTube player error code:", code);
-      // Support for restricted content (Error 150/101)
-      if (code === 150 || code === 101) {
-        setPlayerError("Content restricted. Finding alternative...");
-        try {
-          // Search for a playable alternative (e.g., topic video or audio-only)
-          const query = `${currentSong?.title} ${currentSong?.artist} audio`;
-          const { results } = await api.search(query);
-          const choice = (results || []).find((i: any) => i.videoId !== currentSong?.videoId && (i.type === "song" || i.type === "video"));
-          if (choice) {
-            setTimeout(() => {
-              setPlayerError(null);
-              playSong(choice as Song);
-            }, 1000);
-            return;
-          }
-        } catch (e) {
-          console.error("Alternative search failed", e);
-        }
-      }
-
-      const msg =
-        code === 150 || code === 101
-          ? "This video is restricted from being embedded."
-          : code === 5
-            ? "HTML5 player error."
-            : `Playback error (code ${code}). Trying next track…`;
-      setPlayerError(msg);
-      setTimeout(() => {
-        setPlayerError(null);
-        handleNextRef.current(); // Auto-skip restricted/broken tracks
-      }, 1000); // Speed up the bounce
-    },
-  });
+  // (Moved up for scoping)
 
   useEffect(() => {
     const handleVisible = () => {
@@ -1209,7 +1184,7 @@ function App() {
       setUser(GUEST_USER);
       setIsPlaying(false);
       try { ytPlayer?.pause(); } catch (err) {}
-      try { silentRef.current?.pause(); } catch (err) {}
+      try { silentAudioRef.current?.pause(); } catch (err) {}
       setCurrentSong(null);
       setQueue([]);
       
