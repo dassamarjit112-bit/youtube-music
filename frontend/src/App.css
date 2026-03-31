@@ -4707,3 +4707,16 @@ body {
   white-space: nowrap;
 }
 
+/* --- Background Play Consistency --- */
+.yt-engine {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+  opacity: 0.001; /* Almost transparent but still "visible" to the browser engine */
+  z-index: -1;
+  overflow: hidden;
+}
+

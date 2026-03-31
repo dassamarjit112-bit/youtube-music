@@ -358,7 +358,7 @@ function App() {
 
     // ─── Initialize/Restart Silent Audio (CRITICAL FOR BACKGROUND PLAY) ───
     if (!silentAudioRef.current) {
-      silentAudioRef.current = new Audio('https://www.soundjay.com/buttons/beep-01a.mp3');
+      silentAudioRef.current = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFav7//v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+');
       silentAudioRef.current.loop = true;
     }
     silentAudioRef.current.play().catch(() => { });
@@ -453,6 +453,26 @@ function App() {
         ytPlayer.play();
       }
     };
+    
+    // ─── NATIVE APP BRIDGE (MEDIAN.CO) ───
+    if (typeof window !== 'undefined' && (window as any).median) {
+      const median = (window as any).median;
+      try {
+        if (isPlaying) {
+          median.backgroundAudio.enable();
+          median.screen.setKeepScreenOn(true);
+        } else {
+          median.backgroundAudio.disable();
+          median.screen.setKeepScreenOn(false);
+        }
+      } catch (e) { console.warn("Median Bridge Error:", e); }
+    }
+
+    // Crucial for mobile background continuity
+    if (isPlaying && "mediaSession" in navigator) {
+      navigator.mediaSession.playbackState = "playing";
+    }
+
     document.addEventListener('visibilitychange', handleVisible);
     return () => document.removeEventListener('visibilitychange', handleVisible);
   }, [isPlaying, ytPlayer]);
@@ -510,6 +530,7 @@ function App() {
     });
 
     // 2. Enable the Buttons (Next/Prev/Play/Pause)
+    const nav = navigator.mediaSession;
     nav.setActionHandler("play", () => {
       ytPlayer.play();
       setIsPlaying(true);
@@ -2375,7 +2396,7 @@ function App() {
 
       <audio 
         ref={silentAudioRef} 
-        src="https://www.soundjay.com/buttons/beep-01a.mp3" 
+        src="data:audio/wav;base64,UklGRigAAABXQVZFav7//v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+" 
         loop 
         muted={false} 
         style={{ display: 'none', position: 'absolute', opacity: 0 }} 
