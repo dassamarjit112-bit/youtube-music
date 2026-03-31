@@ -2,7 +2,7 @@
  * useYouTubePlayer – wraps the YouTube IFrame API directly.
  * Improved for stability and control responsive-ness.
  */
-import { useEffect, useRef, useCallback, useMemo, useState } from "react";
+import { useEffect, useRef, useCallback, useMemo } from "react";
 
 declare global {
   interface Window {
@@ -41,7 +41,6 @@ export function useYouTubePlayer(
   options: YTPlayerOptions
 ) {
   const playerRef = useRef<any>(null);
-  const [playerInstance, setPlayerInstance] = useState<any>(null);
   const isReadyRef = useRef(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   
@@ -111,25 +110,28 @@ export function useYouTubePlayer(
         videoId,
         playerVars: {
           autoplay: 1,
+          playsinline: 1, // CRITICAL: Tells iOS/Android NOT to open native video player
           controls: 0,
+          disablekb: 1,
+          fs: 0,
+          showinfo: 0,
           modestbranding: 1,
           rel: 0,
           origin: window.location.origin,
+          widget_referrer: window.location.href,
           iv_load_policy: 3,
           enablejsapi: 1,
         },
         events: {
           onReady: () => {
             isReadyRef.current = true;
-            setPlayerInstance(playerRef.current);
             optionsRef.current.onReady?.();
           },
           onStateChange: (e: any) => onStateChange(e),
           onError: (e: any) => optionsRef.current.onError?.(e.data),
         },
       });
-      // Set instance immediately so it's not null, though it might not be ready
-      setPlayerInstance(playerRef.current);
+      // Set ref immediately (redundant but matches previous lifecycle if needed)
     },
     [containerId, startProgress, stopProgress]
   );
@@ -144,7 +146,7 @@ export function useYouTubePlayer(
     };
   }, [stopProgress]);
 
- const load = useCallback(
+  const load = useCallback(
     (videoId: string) => {
       if (!videoId) return;
       if (window.YT && window.YT.Player) {
@@ -208,6 +210,6 @@ export function useYouTubePlayer(
     pause, 
     seekTo, 
     setVolume, 
-    player: playerInstance 
-  }), [load, cue, play, pause, seekTo, setVolume, playerInstance]);
+    player: playerRef.current 
+  }), [load, cue, play, pause, seekTo, setVolume]);
 }

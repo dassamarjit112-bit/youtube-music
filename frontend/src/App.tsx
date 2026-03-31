@@ -145,7 +145,7 @@ function App() {
     // All persistence is now managed via Supabase or Session only
   }, [favorites, downloads, playlists, currentSong, queue, view]);
 
-  const silentRef = useRef<HTMLAudioElement | null>(null);
+  const silentAudioRef = useRef<HTMLAudioElement | null>(null);
   const wakeLockRef = useRef<any>(null);
 
   // ─── Wake Lock & Background Persistence ───
@@ -162,14 +162,14 @@ function App() {
 
     if (isPlaying) {
       requestWakeLock();
-      silentRef.current?.play().catch(() => { });
+      silentAudioRef.current?.play().catch(() => { });
     } else {
       if (wakeLockRef.current) {
         wakeLockRef.current.release().then(() => {
           wakeLockRef.current = null;
         });
       }
-      silentRef.current?.pause();
+      silentAudioRef.current?.pause();
     }
   }, [isPlaying]);
 
@@ -187,7 +187,7 @@ function App() {
   repeatModeRef.current = repeatMode;
   isShuffleRef.current = isShuffle;
 
-  const handleNext = async () => {
+  const handleNext = useCallback(async () => {
     const q = queueRef.current;
     if (q.length === 0) return;
 
@@ -195,9 +195,8 @@ function App() {
     const currentRepeatMode = repeatModeRef.current;
     const currentIsShuffle = isShuffleRef.current;
 
-    // 0. Repeat ONE — force restart the current song
+    // 0. Repeat ONE
     if (currentRepeatMode === 'one' && currentSongRef.current) {
-      // Use load instead of seekTo for more robust restart on all devices
       ytPlayer.load(currentSongRef.current.videoId);
       setIsPlaying(true);
       return;
@@ -206,10 +205,9 @@ function App() {
     const currentIdx = q.findIndex((s) => s.videoId === currentSongRef.current?.videoId);
     let nextIdx = currentIdx + 1;
 
-    // 1. Shuffle — pick a truly random song (different from current)
+    // 1. Shuffle
     if (currentIsShuffle && q.length > 1) {
       let rand = Math.floor(Math.random() * q.length);
-      // Avoid picking the same song if possible
       while (rand === currentIdx) {
         rand = Math.floor(Math.random() * q.length);
       }
@@ -221,8 +219,27 @@ function App() {
       if (currentRepeatMode === 'all' && q.length > 0) {
         nextIdx = 0;
       } else if (autoPlay && currentSongRef.current) {
-        const lastSong = q[q.length - 1];
-        await triggerAutoPlayExtension(lastSong);
+        // INFINITE MODE: Fetch from API if queue is empty
+        try {
+          const res = await api.watch(currentSongRef.current.videoId);
+          if (res.tracks && res.tracks.length > 0) {
+            const newTracks = res.tracks.filter(t => !q.some(sq => sq.videoId === t.videoId));
+            if (newTracks.length > 0) {
+              setQueue(prev => [...prev, ...newTracks]);
+              setCurrentSong(newTracks[0]);
+              setIsPlaying(true);
+              return;
+            } else {
+               // If no new tracks found, play the first one from API results even if duplicate
+               setCurrentSong(res.tracks[0]);
+               setIsPlaying(true);
+               return;
+            }
+          }
+        } catch (e) {
+          console.error("Autoplay failed", e);
+        }
+        setIsPlaying(false);
         return;
       } else {
         setIsPlaying(false);
@@ -239,7 +256,7 @@ function App() {
     if (autoPlay && nextIdx >= q.length - 3) {
       triggerAutoPlayExtension(nextSong);
     }
-  };
+  }, [ytPlayer, autoPlay]);
 
   // Always keep the ref pointing at the latest handleNext
   handleNextRef.current = handleNext;
@@ -340,11 +357,11 @@ function App() {
     logHistory(song);
 
     // ─── Initialize/Restart Silent Audio (CRITICAL FOR BACKGROUND PLAY) ───
-    if (!silentRef.current) {
-      silentRef.current = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFav7//v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+');
-      silentRef.current.loop = true;
+    if (!silentAudioRef.current) {
+      silentAudioRef.current = new Audio('https://www.soundjay.com/buttons/beep-01a.mp3');
+      silentAudioRef.current.loop = true;
     }
-    silentRef.current.play().catch(() => { });
+    silentAudioRef.current.play().catch(() => { });
 
     // ─── Smart Queue Building ───
     if (songList && songList.length >= 5) {
@@ -478,64 +495,37 @@ function App() {
     }
   }, [isPlaying, currentSong]);
 
-  // ─── Media Session Metadata (Stable & Informative) ───
+  // ─── Native Look Fix (Media Session) ───
   useEffect(() => {
     if (!("mediaSession" in navigator) || !currentSong) return;
-    
-    // Explicitly set metadata to enable system-level player controls
+
+    // 1. Set the Metadata (This makes the background/lockscreen look like Picture 2)
     navigator.mediaSession.metadata = new MediaMetadata({
       title: currentSong.title,
-      artist: currentSong.artist,
-      album: currentSong.album || 'MusicTube',
+      artist: currentSong.artist || "MusicTube",
+      album: "Now Playing",
       artwork: [
-        { src: currentSong.thumbnail, sizes: '512x512', type: 'image/jpeg' },
-        { src: currentSong.thumbnail, sizes: '192x192', type: 'image/jpeg' },
+        { src: currentSong.thumbnail, sizes: '512x512', type: 'image/png' },
       ],
     });
-  }, [currentSong]); // Metadata only changes when song changes
 
-  // ─── Media Session Position State (Frequent Updates) ───
-  useEffect(() => {
-    if (!("mediaSession" in navigator) || !currentSong || duration <= 0) return;
-    
-    // The "Position State" heartbeat helps keep the lock-screen player alive
-    try {
-      navigator.mediaSession.setPositionState({
-        duration: duration,
-        playbackRate: 1.0,
-        position: Math.max(0, Math.min(playedSeconds, duration)),
-      });
-    } catch (e) { 
-      // Some browsers might throw if duration/position is invalid
-    }
-  }, [duration, playedSeconds, currentSong]);
-
-  // Sync Global Playback State
-  useEffect(() => {
-    if ("mediaSession" in navigator) {
-      navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
-    }
-  }, [isPlaying]);
-
-  // ─── Media Session Handlers (Stable) ───
-  useEffect(() => {
-    if (!("mediaSession" in navigator)) return;
-
-    const nav = navigator.mediaSession;
+    // 2. Enable the Buttons (Next/Prev/Play/Pause)
     nav.setActionHandler("play", () => {
       ytPlayer.play();
       setIsPlaying(true);
-      silentRef.current?.play().catch(() => {});
+      silentAudioRef.current?.play().catch(() => {});
     });
     nav.setActionHandler("pause", () => {
       ytPlayer.pause();
       setIsPlaying(false);
-      silentRef.current?.pause();
+      silentAudioRef.current?.pause();
     });
-    nav.setActionHandler("previoustrack", () => handlePrev());
-    nav.setActionHandler("nexttrack", () => handleNext());
     
-    // Position sync
+    // These two lines enable the Skip buttons in Picture 2
+    nav.setActionHandler("previoustrack", handlePrev);
+    nav.setActionHandler("nexttrack", handleNext);
+    
+    // Position sync & seeking
     nav.setActionHandler("seekbackward", (details) => {
       const skipTime = details.seekOffset || 10;
       ytPlayer.seekTo(Math.max(0, (playedSeconds - skipTime) / duration));
@@ -552,19 +542,29 @@ function App() {
       }
     });
 
-    return () => {
-      [ "play", "pause", "previoustrack", "nexttrack", "seekbackward", "seekforward", "seekto"].forEach(
-        (action: any) => nav.setActionHandler(action, null)
-      );
+    // 3. The "Heartbeat" (Keeps the progress bar moving)
+    if (duration > 0) {
+      try {
+        navigator.mediaSession.setPositionState({
+          duration: duration,
+          playbackRate: 1.0,
+          position: Math.min(playedSeconds, duration),
+        });
+      } catch (e) {}
     }
-  }, [ytPlayer, duration, playedSeconds, handleNext, handlePrev]);
+
+    // Update the global playback state
+    navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
+
+  }, [currentSong, isPlaying, playedSeconds, duration, handleNext, handlePrev, ytPlayer]); 
+
 
   // Use silent audio to trick mobile browsers into keeping process alive
   useEffect(() => {
     if (isPlaying && currentSong) {
-      silentRef.current?.play().catch(() => { });
+      silentAudioRef.current?.play().catch(() => { });
     } else {
-      silentRef.current?.pause();
+      silentAudioRef.current?.pause();
     }
   }, [isPlaying, currentSong]);
 
@@ -2374,11 +2374,11 @@ function App() {
       </AnimatePresence>
 
       <audio 
-        ref={silentRef} 
-        src="data:audio/wav;base64,UklGRigAAABXQVZFav7//v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+" 
+        ref={silentAudioRef} 
+        src="https://www.soundjay.com/buttons/beep-01a.mp3" 
         loop 
-        muted 
-        style={{ display: 'none' }} 
+        muted={false} 
+        style={{ display: 'none', position: 'absolute', opacity: 0 }} 
       />
     </div>
   );
