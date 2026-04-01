@@ -1,6 +1,6 @@
 // 1. Enter your DEPLOYED backend URL here (e.g., Render, Railway, Vercel, etc.)
 // Make sure to include /api at the end if your backend routes are prefixed with it.
-const DEPLOYED_BACKEND_URL = "https://musictube-api.vercel.app/api";
+const DEPLOYED_BACKEND_URL = "https://musictube-api-khwh.onrender.com/api";
 
 // 2. Automated logic to use local IP for development and Deployed URL for the APK
 const isLocal = window.location.hostname === "localhost" || 
