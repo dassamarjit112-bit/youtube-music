@@ -1,6 +1,7 @@
 {
   "version": 2,
   "rewrites": [
+    { "handle": "filesystem" },
     {
       "source": "/api/(.*)",
       "destination": "/api/index.py"
@@ -10,6 +11,7 @@
       "destination": "/index.html"
     }
   ],
+
   "framework": "vite",
   "buildCommand": "cd frontend && npm install && npm run build",
   "outputDirectory": "frontend/dist",
