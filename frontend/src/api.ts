@@ -1,16 +1,16 @@
-// 1. Enter your DEPLOYED backend URL here (e.g., Render, Railway, Vercel, etc.)
-// Make sure to include /api at the end if your backend routes are prefixed with it.
-const DEPLOYED_BACKEND_URL = "https://musictube-api-khwh.onrender.com/api";
+// 1. Enter your VERCEL backend URL here (e.g., https://your-app.vercel.app)
+// Leave empty to use the current origin (recommended for Vercel monorepos)
+const VERCEL_URL = ""; 
 
-// 2. Automated logic to use local IP for development and Deployed URL for the APK
+// 2. Automated logic to choose between local and production
 const isLocal = window.location.hostname === "localhost" || 
                 window.location.hostname === "127.0.0.1";
 
-// In Capacitor/APK, the hostname is usually 'localhost' or an internal scheme.
-// We force the deployed URL for the production APK.
+// For production (Vercel), we use relative '/api' or the explicit VERCEL_URL + '/api'
+// For development, we use the local flask server
 const BASE = isLocal 
   ? `http://${window.location.hostname}:5000/api` 
-  : DEPLOYED_BACKEND_URL;
+  : (VERCEL_URL ? `${VERCEL_URL}/api` : "/api");
 
 // ... rest of your Song interfaces and api object ...
 
