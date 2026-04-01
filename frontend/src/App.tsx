@@ -34,13 +34,25 @@ const FALLBACK_THUMB = "https://images.unsplash.com/photo-1470225620780-dba8ba36
 const GUEST_USER = { id: 'guest', email: '', full_name: 'Guest', avatar_url: '', subscription_tier: 'free', isGuest: true };
 
 function App() {
-  const [view, setView] = useState<View>({ name: "account" }); // Start at account by default while we auth
+  const [view, setView] = useState<View>({ name: "home" }); // Default to home to show content immediately
   const [homeData, setHomeData] = useState<HomeSection[]>([]);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
 
   const [user, setUser] = useState<any>(GUEST_USER);
+
+  const navigateTo = (v: View) => {
+    // Only library and specific authenticated views are restricted
+    if (v.name === 'library' && (!isLoggedIn || !isSubscribed)) {
+      if (!isLoggedIn) setView({ name: 'account' });
+      else setView({ name: 'plans' });
+      setIsSidebarOpen(false);
+      return;
+    }
+    setView(v);
+    setIsSidebarOpen(false);
+  };
 
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -124,13 +136,14 @@ function App() {
             localStorage.setItem('ytm_user', JSON.stringify(userObj));
             fetchPlaylists(userObj.id);
             
-            // View management
-            if (userObj.subscription_tier === 'free') {
-               setView({ name: 'plans' });
-            } else { setView({ name: 'home' }); }
+            // Default view management: Let everyone land on home
+            if (userObj.subscription_tier !== 'free') {
+               // Premium users stay on home
+               setView({ name: 'home' }); 
+            }
           }
         } else {
-          setView({ name: 'account' });
+          // No session: User is GUEST_USER, let them stay on home (default state)
         }
 
         // ─── Playback Resumption: Load last known state ───
@@ -1157,15 +1170,7 @@ function App() {
   };
 
 
-  const navigateTo = (v: View) => {
-    if (!isSubscribed && v.name !== 'plans' && v.name !== 'account') {
-      setView({ name: 'plans' });
-      setIsSidebarOpen(false);
-      return;
-    }
-    setView(v);
-    setIsSidebarOpen(false);
-  };
+// (navigateTo was moved to top of App component)
 
   const handleShuffleToggle = () => setIsShuffle(!isShuffle);
   const handleRepeatToggle = () => {

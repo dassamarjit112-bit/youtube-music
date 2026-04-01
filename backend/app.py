@@ -25,7 +25,9 @@ def limit_items(items: Any, limit: int = 12) -> List[Any]:
     return res
 
 # Initialize YTMusic
-# Using authenticated headers.json if it exists for better home feed results
+# Look for headers.json in the backend directory for authenticated access
+headers_file = os.path.join(os.path.dirname(__file__), "headers.json")
+
 try:
     if os.path.exists(headers_file):
         yt = YTMusic(headers_file)

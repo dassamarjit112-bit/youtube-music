@@ -1,19 +1,8 @@
-// 1. Enter your VERCEL backend URL here (e.g., https://your-app.vercel.app)
-// Leave empty to use the current origin (recommended for Vercel monorepos)
-const VERCEL_URL = "https://sd-music-tube.vercel.app";
-
-// 2. Automated logic to choose between local and production
-const isLocal = window.location.hostname === "localhost" ||
-  window.location.hostname === "127.0.0.1" ||
-  window.location.hostname.startsWith("192.168.") ||
-  window.location.hostname.startsWith("172.") ||
-  window.location.hostname.startsWith("10.");
-
-const BASE = isLocal
-  ? `http://${window.location.hostname}:5000/api`
-  : (VERCEL_URL ? `${VERCEL_URL}/api` : "/api");
-
-// ... rest of your Song interfaces and api object ...
+// Unified API Base URL
+// Locally, this hits the Vite proxy (localhost:5173/api -> localhost:5000/api)
+// In production, this hits Vercel's serverless routes (/api -> api/index.py)
+// If VITE_API_URL is set, it will hit that directly (e.g. for Capacitor Android app)
+const BASE = import.meta.env.VITE_API_URL || "/api";
 
 
 export interface Song {

@@ -19,13 +19,16 @@ def limit_items(items: Any, limit: int = 12) -> List[Any]:
     return res
 
 # Initialize YTMusic
-# In Vercel, put your headers.json or oauth_token.json in the 'api' directory if needed,
-# or better yet, use environment variables.
+# Look for headers.json in the api directory for authenticated access
+headers_file = os.path.join(os.path.dirname(__file__), "headers.json")
+
 try:
     if os.path.exists(headers_file):
         yt = YTMusic(headers_file)
+        print("YTMusic initialized with headers.json")
     else:
         yt = YTMusic()
+        print("YTMusic initialized without authentication")
 except Exception as e:
     print(f"YTMusic init error on Vercel: {e}")
     yt = YTMusic()
@@ -164,6 +167,10 @@ def home():
                     elif "subscribers" in item: t = "artist"
                     elif "year" in item: t = "album"
                     elif "playlistId" in item: t = "playlist"
+                    elif "browseId" in item:
+                        if "author" in item: t = "playlist"
+                        elif "artists" in item: t = "album"
+                        else: t = "artist"
                 
                 if t in ("song", "video"): items.append(fmt_song(item))
                 elif t == "artist": items.append(fmt_artist(item))
@@ -172,13 +179,34 @@ def home():
             
             if items:
                 sections.append({"title": title, "items": items})
-    except:
-        # Fallback to charts if home fails
+    except Exception as e:
+        print(f"get_home failed: {e}")
+
+    # Always try to append a 'Global Charts' section if results are sparse
+    if len(sections) < 3:
         try:
             charts_data = yt.get_charts(country="ZZ")
-            if "songs" in charts_data:
+            if "songs" in charts_data and not any(s["title"] == "Top Songs" for s in sections):
                 song_items = limit_items(charts_data["songs"].get("items", []), 12)
                 sections.append({"title": "Global Top Songs", "items": [fmt_song(s) for s in song_items]})
+        except: pass
+
+    # Last resort: search for popular music
+    if len(sections) < 2:
+        try:
+            res = yt.search("Popular Music", limit=20)
+            items = [fmt_song(i) for i in res if i.get("resultType") == "song"]
+            if items:
+                sections.append({"title": "Popular Hits", "items": items[:12]})
+        except: pass
+
+    # If still empty, try trending
+    if len(sections) == 0:
+        try:
+            res = yt.search("Trending songs 2026", limit=20)
+            items = [fmt_song(i) for i in res if i.get("resultType") in ("song", "video")]
+            if items:
+                sections.append({"title": "Trending Now", "items": items[:12]})
         except: pass
 
     return jsonify({"sections": sections})
@@ -318,10 +346,26 @@ def mood_playlists():
 def new_releases():
     try:
         data = yt.get_new_releases()
-        albums = [fmt_album(a) for a in data]
+        if isinstance(data, list):
+            albums_raw = data
+        else:
+            albums_raw = data.get("albums", {}).get("results", []) or data
+        
+        albums = [fmt_album(a) for a in albums_raw]
+        if not albums:
+            # Fallback to general albums search
+            res = yt.search("New Albums", filter="albums", limit=20)
+            albums = [fmt_album(a) for a in res if a.get("resultType") == "album"]
+            
         return jsonify({"albums": albums})
-    except:
+    except Exception as e:
+        print(f"New releases error: {e}")
         return jsonify({"albums": []})
+
+@app.route("/api/health")
+@app.route("/health")
+def health():
+    return jsonify({"status": "ok", "ytmusic": "initialized"})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
