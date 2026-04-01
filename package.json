@@ -4,7 +4,6 @@
   "private": true,
   "scripts": {
     "build": "cd frontend && npm install && npm run build",
-    "build:apk": "cd frontend && npm run build && cd .. && if not exist flutter_app\\assets\\www mkdir flutter_app\\assets\\www && xcopy /E /I /Y frontend\\dist flutter_app\\assets\\www && cd flutter_app && flutter build apk --release"
-     "start": "node index.js" 
+    "build:apk": "cd frontend && npm run build && cd .. && if not exist flutter_app\\assets\\www mkdir flutter_app\\assets\\www && xcopy /E /I /Y frontend\\dist flutter_app\\assets\\www && cd flutter_app && flutter build apk --release
   }
 }
