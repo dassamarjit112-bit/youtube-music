@@ -10,8 +10,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor/android": "^8.3.0",
+    "@capacitor/cli": "^8.3.0",
+    "@capacitor/core": "^8.3.0",
     "@react-oauth/google": "^0.13.4",
     "@supabase/supabase-js": "^2.100.0",
+    "capacitor-music-controls": "npm:capacitor-music-controls-plugin@^6.1.0",
     "clsx": "^2.1.1",
     "framer-motion": "^12.38.0",
     "jwt-decode": "^4.0.0",

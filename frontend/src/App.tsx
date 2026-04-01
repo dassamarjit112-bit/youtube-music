@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
+import { CapacitorMusicControls as MusicControls } from 'capacitor-music-controls';
+
 import {
   Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1,
   Volume2, ThumbsUp, MoreVertical, Search, Download, Mic,
@@ -518,74 +520,59 @@ function App() {
     }
   }, [isPlaying, currentSong]);
 
-  // ─── Native Look Fix (Media Session) ───
+  // ─── Native Look Fix (Capacitor Music Controls) ───
   useEffect(() => {
-    if (!("mediaSession" in navigator) || !currentSong) return;
+    if (!currentSong) return;
 
-    // 1. Set the Metadata (This makes the background/lockscreen look like Picture 2)
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title: currentSong.title,
+    // This creates the "Picture 2" Native Notification
+    MusicControls.create({
+      track: currentSong.title,
       artist: currentSong.artist || "MusicTube",
-      album: currentSong.album || "Now Playing",
-      artwork: [
-        { src: currentSong.thumbnail, sizes: '96x96', type: 'image/png' },
-        { src: currentSong.thumbnail, sizes: '128x128', type: 'image/png' },
-        { src: currentSong.thumbnail, sizes: '192x192', type: 'image/png' },
-        { src: currentSong.thumbnail, sizes: '256x256', type: 'image/png' },
-        { src: currentSong.thumbnail, sizes: '384x384', type: 'image/png' },
-        { src: currentSong.thumbnail, sizes: '512x512', type: 'image/png' },
-      ],
+      cover: currentSong.thumbnail,
+      isPlaying: isPlaying,
+      dismissable: true,
+      hasPrev: true,      // Enables the Previous button
+      hasNext: true,      // Enables the Next button
+      hasClose: true,
+      // Android specific options
+      ticker: 'Now playing ' + currentSong.title,
+      playIcon: 'media_play',
+      pauseIcon: 'media_pause',
+      prevIcon: 'media_prev',
+      nextIcon: 'media_next',
+      closeIcon: 'media_close',
+      notificationIcon: 'notification' 
     });
 
-    // 2. Enable the Buttons (Next/Prev/Play/Pause)
-    const nav = navigator.mediaSession;
-    nav.setActionHandler("play", () => {
-      ytPlayer.play();
-      setIsPlaying(true);
-      silentAudioRef.current?.play().catch(() => {});
-    });
-    nav.setActionHandler("pause", () => {
-      ytPlayer.pause();
-      setIsPlaying(false);
-      silentAudioRef.current?.pause();
-    });
-    
-    // These two lines enable the Skip buttons in Picture 2
-    nav.setActionHandler("previoustrack", handlePrev);
-    nav.setActionHandler("nexttrack", handleNext);
-    
-    // Position sync & seeking
-    nav.setActionHandler("seekbackward", (details) => {
-      const skipTime = details.seekOffset || 10;
-      ytPlayer.seekTo(Math.max(0, (playedSeconds - skipTime) / duration));
-    });
-    nav.setActionHandler("seekforward", (details) => {
-      const skipTime = details.seekOffset || 10;
-      ytPlayer.seekTo(Math.min(0.99, (playedSeconds + skipTime) / duration));
-    });
-    nav.setActionHandler('seekto', (details) => {
-      if (details.seekTime !== undefined && duration > 0) {
-        const newPos = details.seekTime / duration;
-        setPlayed(newPos);
-        ytPlayer.seekTo(newPos);
+    // Listen for clicks on the Notification buttons
+    MusicControls.addListener('controlsNotification', (action: any) => {
+      switch (action.message) {
+        case 'music-controls-next':
+          handleNext();
+          break;
+        case 'music-controls-previous':
+          handlePrev();
+          break;
+        case 'music-controls-pause':
+          ytPlayer.pause();
+          setIsPlaying(false);
+          break;
+        case 'music-controls-play':
+          ytPlayer.play();
+          setIsPlaying(true);
+          break;
+        case 'music-controls-destroy':
+          // Handle closing the app
+          break;
+        default:
+          break;
       }
     });
 
-    // 3. The "Heartbeat" (Keeps the progress bar moving)
-    if (duration > 0) {
-      try {
-        navigator.mediaSession.setPositionState({
-          duration: duration,
-          playbackRate: 1.0,
-          position: Math.min(playedSeconds, duration),
-        });
-      } catch (e) {}
-    }
+    // Update the play/pause state in the notification tray
+    MusicControls.updateIsPlaying({ isPlaying: isPlaying });
 
-    // Update the global playback state
-    navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
-
-  }, [currentSong, isPlaying, playedSeconds, duration, handleNext, handlePrev, ytPlayer]); 
+  }, [currentSong, isPlaying]); 
 
 
   // (Silent Audio handling consolidated into the main Wake Lock effect above)
