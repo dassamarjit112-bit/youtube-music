@@ -78,9 +78,24 @@ async function get<T>(path: string, params: Record<string, string> = {}): Promis
     ? new URL(BASE + path)
     : new URL(BASE + path, window.location.origin);
   Object.entries(params).forEach(([k, v]) => v && url.searchParams.set(k, v));
-  const res = await fetch(url.toString());
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
-  return res.json() as Promise<T>;
+  
+  try {
+    const res = await fetch(url.toString());
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return await res.json() as Promise<T>;
+  } catch (error) {
+    console.warn(`Primary API call to ${url.toString()} failed. Attempting localhost fallback...`, error);
+    try {
+      const fallbackUrl = new URL(`http://localhost:5000/api${path}`);
+      Object.entries(params).forEach(([k, v]) => v && fallbackUrl.searchParams.set(k, v));
+      const fallbackRes = await fetch(fallbackUrl.toString());
+      if (!fallbackRes.ok) throw new Error(`Fallback API error: ${fallbackRes.status}`);
+      return await fallbackRes.json() as Promise<T>;
+    } catch (fallbackError) {
+      console.error("Both primary and localhost fallback API failed.");
+      throw fallbackError; // Throw the ultimate failure
+    }
+  }
 }
 
 export const api = {
