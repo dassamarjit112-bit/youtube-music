@@ -31,6 +31,13 @@ type View =
 
 const FALLBACK_THUMB = "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&h=500&fit=crop";
 
+const formatTime = (s: number) => {
+  if (!s || s < 0 || !isFinite(s)) return "0:00";
+  const m = Math.floor(s / 60);
+  const sc = Math.floor(s % 60);
+  return `${m}:${sc.toString().padStart(2, "0")}`;
+};
+
 const GUEST_USER = { id: 'guest', email: '', full_name: 'Guest', avatar_url: '', subscription_tier: 'free', isGuest: true };
 
 function App() {
@@ -564,7 +571,9 @@ function App() {
       prevIcon: 'media_prev',
       nextIcon: 'media_next',
       closeIcon: 'media_close',
-      notificationIcon: 'notification' 
+      notificationIcon: 'notification',
+      duration: isFinite(duration) ? duration : 0, // CRITICAL: Show duration in lock screen
+      elapsed: isFinite(playedSeconds) ? playedSeconds : 0
     });
 
     // Update the play/pause state in the notification tray
@@ -621,12 +630,12 @@ function App() {
 
   useEffect(() => {
     if (!("mediaSession" in navigator) || !currentSong) return;
-    if (duration > 0) {
+    if (isFinite(duration) && duration > 0 && isFinite(playedSeconds)) {
       try {
         navigator.mediaSession.setPositionState({
           duration: duration,
           playbackRate: 1,
-          position: playedSeconds
+          position: Math.min(playedSeconds, duration)
         });
       } catch (e) {
         console.warn("mediaSession.setPositionState failed:", e);
@@ -1216,12 +1225,6 @@ function App() {
     ytPlayer.seekTo(val);
   };
 
-  const formatTime = (s: number) => {
-    if (!s || s < 0 || !isFinite(s)) return "0:00";
-    const m = Math.floor(s / 60);
-    const sc = Math.floor(s % 60);
-    return `${m}:${sc.toString().padStart(2, "0")}`;
-  };
 
 
 // (navigateTo was moved to top of App component)
@@ -2546,8 +2549,8 @@ const FullScreenPlayer = ({
               className="mobile-progress"
             />
             <div className="time-labels">
-              <span>{Math.floor(playedSeconds / 60)}:{(Math.floor(playedSeconds % 60)).toString().padStart(2, '0')}</span>
-              <span>{Math.floor(duration / 60)}:{(Math.floor(duration % 60)).toString().padStart(2, '0')}</span>
+              <span>{formatTime(playedSeconds)}</span>
+              <span>{formatTime(duration)}</span>
             </div>
           </div>
 

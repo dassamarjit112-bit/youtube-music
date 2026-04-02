@@ -63,12 +63,25 @@ export function useYouTubePlayer(
       try {
         const cur = p.getCurrentTime();
         const dur = p.getDuration();
-        if (dur > 0) {
-          optionsRef.current.onProgress?.(cur / dur, cur);
-          optionsRef.current.onDuration?.(dur);
+
+        // Ensure duration is a valid finite number > 0. 
+        // YouTube returns Infinity for live streams, which we should treat as 0 for seek bars.
+        const validDur = (typeof dur === 'number' && isFinite(dur) && dur > 0) ? dur : 0;
+        const validCur = (typeof cur === 'number' && isFinite(cur)) ? cur : 0;
+
+        if (validDur > 0) {
+          optionsRef.current.onProgress?.(validCur / validDur, validCur);
+          optionsRef.current.onDuration?.(validDur);
+        } else {
+          // If duration is not yet available (or is Infinity for lives), still report current time
+          optionsRef.current.onProgress?.(0, validCur);
+          optionsRef.current.onDuration?.(0);
         }
-      } catch {}
-    }, 500);
+      } catch (e) {
+        console.warn("Progress update failed", e);
+      }
+    }, 1000); // 1s is enough for background updates and less CPU intensive
+
   }, [stopProgress]);
 
   const onStateChange = (e: any) => {
@@ -131,9 +144,8 @@ export function useYouTubePlayer(
           onError: (e: any) => optionsRef.current.onError?.(e.data),
         },
       });
-      // Set ref immediately (redundant but matches previous lifecycle if needed)
     },
-    [containerId, startProgress, stopProgress]
+    [containerId]
   );
 
   useEffect(() => {
@@ -150,7 +162,7 @@ export function useYouTubePlayer(
     (videoId: string) => {
       if (!videoId) return;
       if (window.YT && window.YT.Player) {
-        initPlayer(videoId); // This resolves the TS6133 error
+        initPlayer(videoId);
       } else {
         apiReadyCallbacks.push(() => initPlayer(videoId));
       }
@@ -185,7 +197,9 @@ export function useYouTubePlayer(
     if (!p || typeof p.getDuration !== "function") return;
     try {
       const dur = p.getDuration();
-      p.seekTo(fraction * dur, true);
+      if (dur > 0 && isFinite(dur)) {
+        p.seekTo(fraction * dur, true);
+      }
     } catch {}
   }, []);
 
