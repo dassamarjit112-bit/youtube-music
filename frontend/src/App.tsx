@@ -500,13 +500,6 @@ function App() {
       }).catch(() => {});
     }
 
-    // ─── Initialize/Restart Silent Audio (CRITICAL FOR BACKGROUND PLAY) ───
-    if (!silentAudioRef.current) {
-      silentAudioRef.current = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFav7//v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+');
-      silentAudioRef.current.loop = true;
-    }
-    silentAudioRef.current.play().catch(() => { });
-
     // ─── Smart Queue Building ───
     if (songList && songList.length >= 5) {
       // Use the provided list as the base queue
