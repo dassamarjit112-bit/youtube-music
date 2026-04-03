@@ -493,17 +493,7 @@ function App() {
 
     // ─── Native ExoPlayer Dispatch (Android) ───
     if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
-      api.stream(song.videoId).then(res => {
-         if (res.url) {
-           BackgroundPlayback.playSong({
-              title:  song.title,
-              artist: song.artist || 'MusicTube',
-              url:    res.url
-           }).catch(() => {});
-         }
-      }).catch(e => console.warn("Native stream resolution failed:", e));
-    } else {
-      // Background Service Heartbeat (Keeps process alive for WebView player)
+      // Just keep the background service alive while Webview plays audio securely!
       BackgroundPlayback.startService({
         title:  song.title,
         artist: song.artist || 'MusicTube',
@@ -551,68 +541,25 @@ function App() {
     ytPlayer.setVolume(isMuted ? 0 : volume);
   }, [volume, isMuted, ytPlayer]);
 
-  // ─── Native Progress Sync (Track progress of native ExoPlayer) ────────────────
-  useEffect(() => {
-    if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'android') return;
-    
-    let interval: any = null;
-    if (isPlaying) {
-      interval = setInterval(async () => {
-        try {
-          const state = await BackgroundPlayback.getPlaybackState();
-          // state is { isPlaying: boolean; position: number; duration: number }
-          if (state) {
-            setDuration(state.duration);
-            setPlayedSeconds(state.position);
-            if (state.duration > 0) {
-              setPlayed(state.position / state.duration);
-            } else {
-              setPlayed(0);
-            }
-            
-            // Sync with MediaSession if present
-            if ("mediaSession" in navigator && state.duration > 0) {
-              navigator.mediaSession.setPositionState({
-                 duration:     state.duration,
-                 playbackRate: 1.0,
-                 position:     state.position
-              });
-            }
-          }
-
-        } catch (e) {
-          console.warn("Native progress check failed:", e);
-        }
-      }, 1000);
-    }
-
-    return () => { if (interval) clearInterval(interval); };
-  }, [isPlaying]);
-
   // ─── Unified Playback Controller (Cross-Platform) ───
   // This effect handles loading new songs AND syncing play/pause state
   useEffect(() => {
     if (!currentSong?.videoId) return;
 
+    // 1. Sync Native Background State (Android)
     if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
-       // NATIVE PLAYER: Use native ExoPlayer for Android background robustness
        if (isPlaying) {
          BackgroundPlayback.resume().catch(() => {});
        } else {
          BackgroundPlayback.pause().catch(() => {});
        }
-       // Ensure WebView player is stopped to avoid double-audio
-       if (ytPlayer.player && ytPlayer.player.getPlayerState() === 1) {
-         ytPlayer.pause();
-       }
-       return;
     }
 
-    // WEBVIEW PLAYER: Use YouTube IFrame for Desktop/Web/Dev
+    // 2. WEBVIEW PLAYER: Use YouTube IFrame for actual streaming everywhere
     const player = ytPlayer.player;
     const playerState = player?.getPlayerState?.();
 
-    // If song changed, load it
+    // If song changed, load it into WebView
     staticCurrentSongId.current = staticCurrentSongId.current || "";
     if (staticCurrentSongId.current !== currentSong.videoId) {
       staticCurrentSongId.current = currentSong.videoId;
@@ -621,7 +568,7 @@ function App() {
       return;
     }
 
-    // Sync isPlaying with actual player state
+    // Sync isPlaying with actual webview player state
     if (!player) return;
     
     if (isPlaying) {
@@ -636,6 +583,7 @@ function App() {
       }
     }
   }, [isPlaying, currentSong]);
+
 
   // ─── Native Music Controls: create/update notification ────────────────────
   useEffect(() => {
@@ -711,34 +659,23 @@ function App() {
       // New: Support lock-screen seeking / sliding the progress bar
       navigator.mediaSession.setActionHandler("seekto", (details) => {
         if (details.seekTime !== undefined) {
-          if (Capacitor.getPlatform() === 'android') {
-             BackgroundPlayback.seekTo({ position: details.seekTime });
-          } else {
-             ytPlayer.seekTo(details.seekTime);
-          }
+          ytPlayer.seekTo(details.seekTime);
           setPlayedSeconds(details.seekTime); // Instant UI feedback
         }
       });
       navigator.mediaSession.setActionHandler("seekbackward", (details) => {
         const offset = details.seekOffset || 10;
         const target = Math.max(0, playedSeconds - offset);
-        if (Capacitor.getPlatform() === 'android') {
-           BackgroundPlayback.seekTo({ position: target });
-        } else {
-           ytPlayer.seekTo(target);
-        }
+        ytPlayer.seekTo(target);
         setPlayedSeconds(target);
       });
       navigator.mediaSession.setActionHandler("seekforward", (details) => {
         const offset = details.seekOffset || 10;
         const target = Math.min(duration, playedSeconds + offset);
-        if (Capacitor.getPlatform() === 'android') {
-           BackgroundPlayback.seekTo({ position: target });
-        } else {
-           ytPlayer.seekTo(target);
-        }
+        ytPlayer.seekTo(target);
         setPlayedSeconds(target);
       });
+
     }
 
     return () => {
@@ -1344,15 +1281,7 @@ function App() {
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseFloat(e.target.value);
     setPlayed(val);
-    
-    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
-      // For native, we need the total duration to calculate seconds
-      if (duration > 0) {
-        BackgroundPlayback.seekTo({ position: val * duration });
-      }
-    } else {
-      ytPlayer.seekTo(val);
-    }
+    ytPlayer.seekTo(val);
   };
 
 
