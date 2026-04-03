@@ -126,6 +126,28 @@ def fmt_playlist(item):
 
 # ─── API ROUTES ──────────────────────────────────────────────────────────────
 
+@app.route("/api/stream/<video_id>")
+@app.route("/stream/<video_id>")
+def stream(video_id):
+    if not video_id:
+        return jsonify({"error": "No videoId"}), 400
+    try:
+        import yt_dlp
+        # Extract direct stream URL without downloading
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'quiet': True,
+            'no_warnings': True,
+            'nocheckcertificate': True
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            url = f"https://www.youtube.com/watch?v={video_id}"
+            info = ydl.extract_info(url, download=False)
+            return jsonify({"url": info.get("url")})
+    except Exception as e:
+        print(f"Stream resolve error: {e}")
+        return jsonify({"error": str(e)}), 500
+
 @app.route("/api/search")
 @app.route("/search")
 def search():
