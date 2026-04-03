@@ -6,12 +6,13 @@ import { Capacitor } from '@capacitor/core';
 let BASE = import.meta.env.VITE_API_URL || "/api";
 
 // CRITICAL: On Android, "localhost" refers to the device. 
-// If BASE is still "/api" or "localhost", we need to point to the PC's actual IP.
+// If BASE is still "/api" or "localhost", we need to point to the PC's actual IP or production.
 if (Capacitor.isNativePlatform() && (BASE === "/api" || BASE.includes("localhost"))) {
   // If you are testing on a real device, you SHOULD set VITE_API_URL in .env to your PC IP!
-  // Fallback to a common emulator host IP if nothing else is set.
-  if (BASE === "/api") BASE = "http://10.0.2.2:5000/api";
+  // Fallback to the production backend since it's deployed.
+  BASE = "https://sd-music-tube.vercel.app/api";
 }
+
 
 
 export interface Song {
