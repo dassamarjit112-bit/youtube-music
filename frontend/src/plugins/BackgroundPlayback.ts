@@ -1,26 +1,38 @@
 /**
- * BackgroundPlayback Capacitor Plugin
+ * BackgroundPlayback Capacitor Plugin (Media3 Implementation)
  *
- * Bridges JavaScript to the native MusicPlayerService on Android.
- * On web/iOS (where the service doesn't exist), all calls are no-ops so the
- * app continues to work without crashing.
+ * Bridges JavaScript to the native MusicPlayerService (ExoPlayer) on Android.
  */
 import { registerPlugin } from '@capacitor/core';
 
 export interface BackgroundPlaybackPlugin {
-  /** Start the Android foreground service and update the notification. */
+  /** Start/Update the Android Service (Legacy). */
   startService(options: { title: string; artist: string }): Promise<void>;
-  /** Update the notification text while the service is running. */
-  updateMetadata(options: { title: string; artist: string }): Promise<void>;
-  /** Stop the service (call when playback is fully stopped by user). */
+  
+  /** Play a song via native ExoPlayer. */
+  playSong(options: { title: string; artist: string; url: string }): Promise<void>;
+  
+  /** Pause native playback. */
+  pause(): Promise<void>;
+  
+  /** Resume native playback. */
+  resume(): Promise<void>;
+
+  /** Stop the service (call when playback is fully stopped). */
   stopService(): Promise<void>;
+  
+  /** Update metadata. */
+  updateMetadata(options: { title: string; artist: string }): Promise<void>;
 }
 
 // Web stub — all methods are no-ops when running outside Android
 const WebImpl: BackgroundPlaybackPlugin = {
   startService:   async () => {},
-  updateMetadata: async () => {},
+  playSong:       async () => {},
+  pause:          async () => {},
+  resume:         async () => {},
   stopService:    async () => {},
+  updateMetadata: async () => {},
 };
 
 export const BackgroundPlayback = registerPlugin<BackgroundPlaybackPlugin>(

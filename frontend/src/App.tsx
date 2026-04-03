@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
+import { Capacitor } from '@capacitor/core';
 import { CapacitorMusicControls as MusicControls } from 'capacitor-music-controls';
 import { BackgroundPlayback } from './plugins/BackgroundPlayback';
 
@@ -490,13 +491,24 @@ function App() {
     setDuration(0);
     logHistory(song);
 
-    // ─── Start/Update Native Background Service (KEEPS PROCESS ALIVE) ───
-    // This is the primary mechanism that prevents Android from killing the app
-    // when the screen turns off or the user switches to another app.
-    BackgroundPlayback.startService({
-      title:  song.title,
-      artist: song.artist || 'MusicTube',
-    }).catch(() => {});
+    // ─── Native ExoPlayer Dispatch (Android) ───
+    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
+      api.stream(song.videoId).then(res => {
+         if (res.url) {
+           BackgroundPlayback.playSong({
+              title:  song.title,
+              artist: song.artist || 'MusicTube',
+              url:    res.url
+           }).catch(() => {});
+         }
+      }).catch(e => console.warn("Native stream resolution failed:", e));
+    } else {
+      // Background Service Heartbeat (Keeps process alive for WebView player)
+      BackgroundPlayback.startService({
+        title:  song.title,
+        artist: song.artist || 'MusicTube',
+      }).catch(() => {});
+    }
 
     // ─── Initialize/Restart Silent Audio (CRITICAL FOR BACKGROUND PLAY) ───
     if (!silentAudioRef.current) {
@@ -539,11 +551,26 @@ function App() {
     ytPlayer.setVolume(isMuted ? 0 : volume);
   }, [volume, isMuted, ytPlayer]);
 
-  // ─── Unified Playback Controller ───
+  // ─── Unified Playback Controller (Cross-Platform) ───
   // This effect handles loading new songs AND syncing play/pause state
   useEffect(() => {
     if (!currentSong?.videoId) return;
 
+    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
+       // NATIVE PLAYER: Use native ExoPlayer for Android background robustness
+       if (isPlaying) {
+         BackgroundPlayback.resume().catch(() => {});
+       } else {
+         BackgroundPlayback.pause().catch(() => {});
+       }
+       // Ensure WebView player is stopped to avoid double-audio
+       if (ytPlayer.player && ytPlayer.player.getPlayerState() === 1) {
+         ytPlayer.pause();
+       }
+       return;
+    }
+
+    // WEBVIEW PLAYER: Use YouTube IFrame for Desktop/Web/Dev
     const player = ytPlayer.player;
     const playerState = player?.getPlayerState?.();
 

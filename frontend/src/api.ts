@@ -114,6 +114,8 @@ export const api = {
 
   watch: (videoId: string) => get<{ tracks: Song[] }>(`/watch/${videoId}`),
 
+  stream: (videoId: string) => get<{ url: string }>(`/stream/${videoId}`),
+
   moods: () => get<{ categories: { title: string; items: { title: string; params: string; thumbnail: string }[] }[] }>("/explore/moods"),
 
   moodPlaylists: (params: string) => get<{ playlists: Playlist[] }>("/explore/mood", { params }),

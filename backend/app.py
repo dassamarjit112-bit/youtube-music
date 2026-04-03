@@ -10,9 +10,32 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from ytmusicapi import YTMusic
 from typing import List, Any
+import yt_dlp
 
 app = Flask(__name__)
 CORS(app)
+
+# ─── STREAM RESOLVER (For Native ExoPlayer) ──────────────────────────────
+
+@app.route("/api/stream/<video_id>")
+def stream(video_id):
+    if not video_id:
+        return jsonify({"error": "No videoId"}), 400
+    try:
+        # Extract direct stream URL without downloading
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'quiet': True,
+            'no_warnings': True,
+            'nocheckcertificate': True
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            url = f"https://www.youtube.com/watch?v={video_id}"
+            info = ydl.extract_info(url, download=False)
+            return jsonify({"url": info.get("url")})
+    except Exception as e:
+        print(f"Stream resolve error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 def limit_items(items: Any, limit: int = 12) -> List[Any]:
     """Helper to limit items without using slices, avoiding indexing lint errors."""
