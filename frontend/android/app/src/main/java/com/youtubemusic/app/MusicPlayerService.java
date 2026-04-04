@@ -45,6 +45,19 @@ public class MusicPlayerService extends MediaSessionService {
     private WifiManager.WifiLock wifiLock;
     private final ExecutorService artworkExecutor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private boolean isBroadcasting = false;
+
+    private final Runnable positionBroadcaster = new Runnable() {
+        @Override
+        public void run() {
+            if (player != null && (player.isPlaying() || player.getPlaybackState() == Player.STATE_BUFFERING)) {
+                broadcastPosition();
+                mainHandler.postDelayed(this, 1000);
+            } else {
+                isBroadcasting = false;
+            }
+        }
+    };
 
     @Override
     public void onCreate() {
@@ -97,14 +110,44 @@ public class MusicPlayerService extends MediaSessionService {
             @Override
             public void onPlaybackStateChanged(int playbackState) {
                 broadcastEvent("playbackStateChanged", String.valueOf(playbackState));
+                if (playbackState == Player.STATE_READY && !isBroadcasting) {
+                    isBroadcasting = true;
+                    mainHandler.post(positionBroadcaster);
+                }
+            }
+
+            @Override
+            public void onIsPlayingChanged(boolean isPlaying) {
+                if (isPlaying && !isBroadcasting) {
+                    isBroadcasting = true;
+                    mainHandler.post(positionBroadcaster);
+                }
             }
         });
 
         mediaSession = new MediaSession.Builder(this, player)
             .setCallback(new MediaSession.Callback() {
-                // Media3 handles standard transport controls automatically if linked to player
+                @Override
+                public int onPlayerCommandRequest(MediaSession session, MediaSession.ControllerInfo controller, int command) {
+                    if (command == Player.COMMAND_SEEK_TO_NEXT || command == Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM) {
+                        broadcastEvent("trackTransition", "skipNext");
+                    } else if (command == Player.COMMAND_SEEK_TO_PREVIOUS || command == Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM) {
+                        broadcastEvent("trackTransition", "skipPrev");
+                    }
+                    return MediaSession.Callback.super.onPlayerCommandRequest(session, controller, command);
+                }
             })
             .build();
+    }
+
+    private void broadcastPosition() {
+        if (player != null && BackgroundPlaybackPlugin.instance != null) {
+            JSObject ret = new JSObject();
+            ret.put("type", "positionUpdate");
+            ret.put("position", player.getCurrentPosition() / 1000.0);
+            ret.put("duration", player.getDuration() / 1000.0);
+            BackgroundPlaybackPlugin.instance.broadcastEvent("onPlayerUpdate", ret);
+        }
     }
 
     private void broadcastEvent(String type, String message) {

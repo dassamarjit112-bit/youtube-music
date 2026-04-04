@@ -34,7 +34,12 @@ export interface BackgroundPlaybackPlugin {
   /** Listener for native player updates (track changes, state, errors). */
   addListener(
     eventName: 'onPlayerUpdate',
-    listenerFunc: (data: { type: string; message: string }) => void
+    listenerFunc: (data: { 
+      type: string; 
+      message?: string; 
+      position?: number; 
+      duration?: number; 
+    }) => void
   ): Promise<PluginListenerHandle>;
 }
 

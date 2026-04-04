@@ -554,10 +554,23 @@ function App() {
     
     // Add real-time listener for native player updates
     const nativeListener = BackgroundPlayback.addListener('onPlayerUpdate', (data) => {
-      console.log("Native Player Update:", data.type, data.message);
+      // console.log("Native Player Update:", data.type, data.message);
       if (data.type === 'trackTransition') {
-        // Native player skipped to next song automatically
-        handleNextRef.current();
+        if (data.message === 'skipNext') {
+            handleNextRef.current();
+        } else if (data.message === 'skipPrev') {
+            handlePrevRef.current();
+        } else {
+            handleNextRef.current(); // default
+        }
+      } else if (data.type === 'positionUpdate') {
+         // Real-time progress sync from native service
+         if (data.position && data.position > 0) {
+            setPlayedSeconds(data.position);
+         }
+         if (data.duration && data.duration > 0 && !isFinite(duration)) {
+            setDuration(data.duration);
+         }
       } else if (data.type === 'playerError') {
         setPlayerError(`Native Playback Error: ${data.message}`);
       }
@@ -633,32 +646,36 @@ function App() {
        }
     }
 
-    // 2. WEBVIEW PLAYER: Use YouTube IFrame for actual streaming everywhere
-    const player = ytPlayer.player;
-    const playerState = player?.getPlayerState?.();
-
-    // If song changed, load it into WebView
-    staticCurrentSongId.current = staticCurrentSongId.current || "";
-    if (staticCurrentSongId.current !== currentSong.videoId) {
-      staticCurrentSongId.current = currentSong.videoId;
-      setPlayerError(null);
-      ytPlayer.load(currentSong.videoId);
-      return;
-    }
-
-    // Sync isPlaying with actual webview player state
-    if (!player) return;
-    
-    if (isPlaying) {
-      // If we want to play but player is paused or ended
-      if (playerState === 2 || playerState === 0 || playerState === 5 || playerState === -1) {
-        ytPlayer.play();
-      }
+    // ─── UNIFIED PLAYBACK CONTROLLER (NATIVE-FIRST ON ANDROID) ───
+    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
+       if (isPlaying) {
+         BackgroundPlayback.resume().catch(() => {});
+       } else {
+         BackgroundPlayback.pause().catch(() => {});
+       }
+       // Since native handles audio, we skip the Webview IFrame sync below
     } else {
-      // If we want to pause but player is playing or buffering
-      if (playerState === 1 || playerState === 3) {
-        ytPlayer.pause();
-      }
+        const player = ytPlayer.player;
+        const playerState = player?.getPlayerState?.();
+
+        if (staticCurrentSongId.current !== currentSong.videoId) {
+          staticCurrentSongId.current = currentSong.videoId;
+          setPlayerError(null);
+          ytPlayer.load(currentSong.videoId);
+          return;
+        }
+
+        if (player) {
+          if (isPlaying) {
+            if (playerState === 2 || playerState === 0 || playerState === 5 || playerState === -1) {
+              ytPlayer.play();
+            }
+          } else {
+            if (playerState === 1 || playerState === 3) {
+              ytPlayer.pause();
+            }
+          }
+        }
     }
   }, [isPlaying, currentSong]);
 
