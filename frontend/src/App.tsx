@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import { CapacitorMusicControls as MusicControls } from 'capacitor-music-controls';
 
@@ -463,7 +462,7 @@ function App() {
   };
 
 
-  const currentStreamUrlRef = useRef("");
+
 
   const playSong = async (song: Song, songList?: Song[]) => {
     if (!song.videoId) return;
