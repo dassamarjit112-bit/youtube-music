@@ -1,58 +1,28 @@
 package com.youtubemusic.app;
 
-import android.content.ComponentName;
-import android.content.Context;
 import android.content.Intent;
-import android.content.ServiceConnection;
 import android.os.Build;
-import android.os.IBinder;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import androidx.media3.exoplayer.ExoPlayer;
 
 /**
- * BackgroundPlaybackPlugin (NouTube Style)
- * Connects the React/WebView engine to the native NouService-inspired bridge.
+ * BackgroundPlaybackPlugin
+ * Capacitor bridge for the Native ExoPlayer engine.
+ * Emits 'onPlayerUpdate' events to JavaScript.
  */
 @CapacitorPlugin(name = "BackgroundPlayback")
 public class BackgroundPlaybackPlugin extends Plugin {
 
     public static BackgroundPlaybackPlugin instance;
-    private MusicPlayerService musicService;
-    private boolean isBound = false;
-
-    private final ServiceConnection serviceConnection = new ServiceConnection() {
-        @Override
-        public void onServiceConnected(ComponentName name, IBinder service) {
-            MusicPlayerService.MusicBinder binder = (MusicPlayerService.MusicBinder) service;
-            musicService = binder.getService();
-            isBound = true;
-        }
-
-        @Override
-        public void onServiceDisconnected(ComponentName name) {
-            musicService = null;
-            isBound = false;
-        }
-    };
 
     @Override
     public void load() {
         super.load();
         instance = this;
-        bindToService();
-    }
-
-    private void bindToService() {
-        Intent intent = new Intent(getContext(), MusicPlayerService.class);
-        getContext().bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            getContext().startForegroundService(intent);
-        } else {
-            getContext().startService(intent);
-        }
     }
 
     public void broadcastEvent(String eventName, JSObject data) {
@@ -60,54 +30,118 @@ public class BackgroundPlaybackPlugin extends Plugin {
     }
 
     @PluginMethod
-    public void notify(PluginCall call) {
-        String title = call.getString("title", "MusicTube");
+    public void startService(PluginCall call) {
+        Intent intent = new Intent(getContext(), MusicPlayerService.class);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            getContext().startForegroundService(intent);
+        } else {
+            getContext().startService(intent);
+        }
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void playSong(PluginCall call) {
+        String title  = call.getString("title",  "MusicTube");
         String artist = call.getString("artist", "Playing…");
+        String url    = call.getString("url");
         String imageUrl = call.getString("imageUrl");
-        long duration = call.getDouble("duration", 0.0).longValue();
 
-        if (isBound && musicService != null) {
-            musicService.updateMetadata(title, artist, imageUrl, duration);
-            call.resolve();
-        } else {
-            call.reject("Music service not bound");
+        if (url == null || url.isEmpty()) {
+            call.reject("URL is required");
+            return;
         }
+
+        Intent intent = new Intent(getContext(), MusicPlayerService.class);
+        intent.putExtra("action", "play");
+        intent.putExtra("title",  title);
+        intent.putExtra("artist", artist);
+        intent.putExtra("url",    url);
+        intent.putExtra("imageUrl", imageUrl);
+        intent.putExtra("duration", (long)(call.getDouble("duration", 0.0) * 1000));
+
+        getContext().startService(intent);
+        call.resolve();
     }
 
     @PluginMethod
-    public void notifyProgress(PluginCall call) {
-        boolean isPlaying = call.getBoolean("isPlaying", false);
-        Double position = call.getDouble("position", 0.0);
-        if (isBound && musicService != null) {
-            musicService.updatePlaybackState(isPlaying, position.longValue());
-            call.resolve();
-        } else {
-            call.reject("Music service not bound");
-        }
+    public void pause(PluginCall call) {
+        Intent intent = new Intent(getContext(), MusicPlayerService.class);
+        intent.putExtra("action", "pause");
+        getContext().startService(intent);
+        call.resolve();
     }
 
-    // Legacy method stubs to prevent build errors in App.tsx before it is fully refactored
     @PluginMethod
-    public void startService(PluginCall call) { call.resolve(); }
+    public void resume(PluginCall call) {
+        Intent intent = new Intent(getContext(), MusicPlayerService.class);
+        intent.putExtra("action", "resume");
+        getContext().startService(intent);
+        call.resolve();
+    }
+
     @PluginMethod
-    public void playSong(PluginCall call) { call.resolve(); }
+    public void next(PluginCall call) {
+        Intent intent = new Intent(getContext(), MusicPlayerService.class);
+        intent.putExtra("action", "next");
+        getContext().startService(intent);
+        call.resolve();
+    }
+
     @PluginMethod
-    public void pause(PluginCall call) { call.resolve(); }
+    public void previous(PluginCall call) {
+        Intent intent = new Intent(getContext(), MusicPlayerService.class);
+        intent.putExtra("action", "previous");
+        getContext().startService(intent);
+        call.resolve();
+    }
+
     @PluginMethod
-    public void resume(PluginCall call) { call.resolve(); }
+    public void seekTo(PluginCall call) {
+        Double position = call.getDouble("position");
+        if (position == null) {
+            call.reject("Position required");
+            return;
+        }
+        Intent intent = new Intent(getContext(), MusicPlayerService.class);
+        intent.putExtra("action", "seek");
+        intent.putExtra("position", (long)(position * 1000));
+        getContext().startService(intent);
+        call.resolve();
+    }
+
     @PluginMethod
-    public void stopService(PluginCall call) { 
-        getContext().unbindService(serviceConnection);
+    public void getPlaybackState(PluginCall call) {
+        ExoPlayer player = MusicPlayerService.getStaticPlayer();
+        JSObject ret = new JSObject();
+        if (player == null) {
+            ret.put("isPlaying", false);
+            ret.put("position", 0);
+            ret.put("duration", 0);
+        } else {
+            ret.put("isPlaying", player.getPlayWhenReady());
+            ret.put("position", (double)player.getCurrentPosition() / 1000.0);
+            long duration = player.getDuration();
+            ret.put("duration", (double)(duration < 0 ? 0 : duration) / 1000.0);
+        }
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void stopService(PluginCall call) {
         Intent intent = new Intent(getContext(), MusicPlayerService.class);
         getContext().stopService(intent);
         call.resolve();
     }
 
+    @PluginMethod
+    public void updateMetadata(PluginCall call) {
+        // Handled via playSong usually, but kept for future use.
+        call.resolve();
+    }
+
     @Override
     protected void handleOnDestroy() {
-        if (isBound) {
-            getContext().unbindService(serviceConnection);
-        }
         instance = null;
         super.handleOnDestroy();
     }
