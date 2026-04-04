@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { Capacitor } from '@capacitor/core';
+import { App as CapacitorApp } from '@capacitor/app';
 import { CapacitorMusicControls as MusicControls } from 'capacitor-music-controls';
 import { BackgroundPlayback } from './plugins/BackgroundPlayback';
 
@@ -463,6 +464,8 @@ function App() {
   };
 
 
+  const currentStreamUrlRef = useRef("");
+
   const playSong = async (song: Song, songList?: Song[]) => {
     if (!song.videoId) return;
 
@@ -493,7 +496,16 @@ function App() {
 
     // ─── Native ExoPlayer Dispatch (Android) ───
     if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
-      // Just keep the background service alive while Webview plays audio securely!
+      currentStreamUrlRef.current = ""; // Reset for new song
+      // Cache stream URL securely without triggering IP block immediately.
+      // This will be ready when the app goes to the background.
+      api.stream(song.videoId).then(res => {
+         if (res.url) {
+           currentStreamUrlRef.current = res.url;
+         }
+      }).catch(e => console.warn("Background stream prep failed:", e));
+
+      // Keep process alive for Webview
       BackgroundPlayback.startService({
         title:  song.title,
         artist: song.artist || 'MusicTube',
@@ -527,6 +539,47 @@ function App() {
     
     document.addEventListener('visibilitychange', handleVisible);
     return () => document.removeEventListener('visibilitychange', handleVisible);
+  }, [isPlaying, ytPlayer]);
+
+  // ─── BACKGROUND HANDOFF ───
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'android') return;
+    
+    const listener = CapacitorApp.addListener('appStateChange', async ({ isActive }) => {
+      if (!currentSongRef.current) return;
+      
+      if (!isActive) {
+        // APP CLOSED/BACKGROUNDED -> Hand off to Native ExoPlayer
+        if (ytPlayer.player && typeof ytPlayer.player.getCurrentTime === 'function') {
+          const currentTime = ytPlayer.player.getCurrentTime() || 0;
+          ytPlayer.pause();
+          
+          if (currentStreamUrlRef.current && isPlaying) {
+            BackgroundPlayback.playSong({
+              title: currentSongRef.current.title,
+              artist: currentSongRef.current.artist || 'MusicTube',
+              url: currentStreamUrlRef.current
+            }).then(() => {
+              // Immediately seek native player to current time
+              BackgroundPlayback.seekTo({ position: currentTime });
+            }).catch(() => {});
+          }
+        }
+      } else {
+        // APP OPENED/FOREGROUNDED -> Hand off back to WebView
+        const nativeState = await BackgroundPlayback.getPlaybackState().catch(() => null);
+        BackgroundPlayback.pause().catch(() => {});
+        
+        if (nativeState && nativeState.position > 0) {
+          ytPlayer.seekTo(nativeState.position);
+        }
+        if (isPlaying) {
+          ytPlayer.play();
+        }
+      }
+    });
+
+    return () => { listener.then(l => l.remove()); };
   }, [isPlaying, ytPlayer]);
 
   // Volume sync
