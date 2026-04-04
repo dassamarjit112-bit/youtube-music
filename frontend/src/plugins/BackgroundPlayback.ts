@@ -10,7 +10,7 @@ export interface BackgroundPlaybackPlugin {
   startService(options: { title: string; artist: string }): Promise<void>;
   
   /** Play a song via native ExoPlayer. */
-  playSong(options: { title: string; artist: string; url: string }): Promise<void>;
+  playSong(options: { title: string; artist: string; url: string; imageUrl?: string }): Promise<void>;
   
   /** Pause native playback. */
   pause(): Promise<void>;
@@ -22,7 +22,7 @@ export interface BackgroundPlaybackPlugin {
   stopService(): Promise<void>;
   
   /** Update metadata. */
-  updateMetadata(options: { title: string; artist: string }): Promise<void>;
+  updateMetadata(options: { title: string; artist: string; imageUrl?: string }): Promise<void>;
 
   /** NEW: Get current playback position and duration. */
   getPlaybackState(): Promise<{ isPlaying: boolean; position: number; duration: number }>;
