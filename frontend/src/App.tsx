@@ -502,6 +502,13 @@ function App() {
       api.stream(song.videoId).then(res => {
          if (res.url) {
            currentStreamUrlRef.current = res.url;
+           // TRIGGER NATIVE PLAY IMMEDIATELY ONCE URL ARRIVES
+           BackgroundPlayback.playSong({
+             title:  song.title,
+             artist: song.artist || 'MusicTube',
+             url:    res.url,
+             imageUrl: song.thumbnail
+           }).catch(() => {});
          }
       }).catch(e => console.warn("Background stream prep failed:", e));
 
@@ -656,39 +663,33 @@ function App() {
   }, [isPlaying, currentSong]);
 
 
-  // ─── Native Music Controls: create/update notification ────────────────────
   useEffect(() => {
     if (!currentSong) return;
 
-    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
-        BackgroundPlayback.playSong({
-          title:    currentSong.title,
-          artist:   currentSong.artist || 'MusicTube',
-          url:      currentStreamUrlRef.current,
-          imageUrl: currentSong.thumbnail
-        }).catch(() => {});
-    } else {
-        MusicControls.create({
-          track: currentSong.title,
-          artist: currentSong.artist || "MusicTube",
-          cover: currentSong.thumbnail,
-          isPlaying: isPlaying,
-          dismissable: true,
-          hasPrev: true,
-          hasNext: true,
-          hasClose: true,
-          ticker: 'Now playing ' + currentSong.title,
-          playIcon: 'media_play',
-          pauseIcon: 'media_pause',
-          prevIcon: 'media_prev',
-          nextIcon: 'media_next',
-          closeIcon: 'media_close',
-          notificationIcon: 'notification',
-          duration: isFinite(duration) ? duration : 0,
-          elapsed: isFinite(playedSeconds) ? playedSeconds : 0
-        }).catch(() => {});
-    }
-  }, [currentSong, isPlaying]);
+    // Use CapacitorMusicControls as a secondary UI bridge for the notification shade
+    // while the BackgroundPlayback service handles the actual audio process.
+    MusicControls.create({
+      track: currentSong.title,
+      artist: currentSong.artist || "MusicTube",
+      cover: currentSong.thumbnail,
+      isPlaying: isPlaying,
+      dismissable: true,
+      hasPrev: true,
+      hasNext: true,
+      hasClose: true,
+      ticker: 'Now playing ' + currentSong.title,
+      playIcon: 'media_play',
+      pauseIcon: 'media_pause',
+      prevIcon: 'media_prev',
+      nextIcon: 'media_next',
+      closeIcon: 'media_close',
+      notificationIcon: 'notification',
+      duration: isFinite(duration) ? duration : 0,
+      elapsed: isFinite(playedSeconds) ? playedSeconds : 0
+    }).catch(() => {});
+
+    MusicControls.updateIsPlaying({ isPlaying: isPlaying });
+  }, [currentSong, isPlaying, duration]);
 
   // Global static native listeners
   useEffect(() => {
