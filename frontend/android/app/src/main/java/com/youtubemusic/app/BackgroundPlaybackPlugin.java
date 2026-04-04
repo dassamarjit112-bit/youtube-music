@@ -11,16 +11,26 @@ import androidx.media3.exoplayer.ExoPlayer;
 
 /**
  * BackgroundPlaybackPlugin
- *
- * Capacitor bridge that lets JavaScript control the Native ExoPlayer
- * inside MusicPlayerService.
+ * Capacitor bridge for the Native ExoPlayer engine.
+ * Emits 'onPlayerUpdate' events to JavaScript.
  */
 @CapacitorPlugin(name = "BackgroundPlayback")
 public class BackgroundPlaybackPlugin extends Plugin {
 
+    public static BackgroundPlaybackPlugin instance;
+
+    @Override
+    public void load() {
+        super.load();
+        instance = this;
+    }
+
+    public void broadcastEvent(String eventName, JSObject data) {
+        notifyListeners(eventName, data);
+    }
+
     @PluginMethod
     public void startService(PluginCall call) {
-        // Legacy compat (just ensures service is running)
         Intent intent = new Intent(getContext(), MusicPlayerService.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             getContext().startForegroundService(intent);
@@ -34,11 +44,11 @@ public class BackgroundPlaybackPlugin extends Plugin {
     public void playSong(PluginCall call) {
         String title  = call.getString("title",  "MusicTube");
         String artist = call.getString("artist", "Playing…");
-        String url    = call.getString("url"); // Final stream URL
-        String imageUrl = call.getString("imageUrl"); // Artwork URL
+        String url    = call.getString("url");
+        String imageUrl = call.getString("imageUrl");
 
         if (url == null || url.isEmpty()) {
-            call.reject("URL is required for native playback");
+            call.reject("URL is required");
             return;
         }
 
@@ -49,12 +59,7 @@ public class BackgroundPlaybackPlugin extends Plugin {
         intent.putExtra("url",    url);
         intent.putExtra("imageUrl", imageUrl);
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            getContext().startForegroundService(intent);
-        } else {
-            getContext().startService(intent);
-        }
-
+        getContext().startService(intent);
         call.resolve();
     }
 
@@ -75,15 +80,31 @@ public class BackgroundPlaybackPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void next(PluginCall call) {
+        Intent intent = new Intent(getContext(), MusicPlayerService.class);
+        intent.putExtra("action", "next");
+        getContext().startService(intent);
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void previous(PluginCall call) {
+        Intent intent = new Intent(getContext(), MusicPlayerService.class);
+        intent.putExtra("action", "previous");
+        getContext().startService(intent);
+        call.resolve();
+    }
+
+    @PluginMethod
     public void seekTo(PluginCall call) {
-        Double position = call.getDouble("position"); // seconds
+        Double position = call.getDouble("position");
         if (position == null) {
-            call.reject("Position is required");
+            call.reject("Position required");
             return;
         }
         Intent intent = new Intent(getContext(), MusicPlayerService.class);
         intent.putExtra("action", "seek");
-        intent.putExtra("position", (long)(position * 1000)); // convert to ms
+        intent.putExtra("position", (long)(position * 1000));
         getContext().startService(intent);
         call.resolve();
     }
@@ -92,7 +113,6 @@ public class BackgroundPlaybackPlugin extends Plugin {
     public void getPlaybackState(PluginCall call) {
         ExoPlayer player = MusicPlayerService.getStaticPlayer();
         JSObject ret = new JSObject();
-        
         if (player == null) {
             ret.put("isPlaying", false);
             ret.put("position", 0);
@@ -101,10 +121,7 @@ public class BackgroundPlaybackPlugin extends Plugin {
             ret.put("isPlaying", player.getPlayWhenReady());
             ret.put("position", (double)player.getCurrentPosition() / 1000.0);
             long duration = player.getDuration();
-            if (duration < 0) {
-                duration = 0;
-            }
-            ret.put("duration", (double)duration / 1000.0);
+            ret.put("duration", (double)(duration < 0 ? 0 : duration) / 1000.0);
         }
         call.resolve(ret);
     }
@@ -118,8 +135,13 @@ public class BackgroundPlaybackPlugin extends Plugin {
 
     @PluginMethod
     public void updateMetadata(PluginCall call) {
-        // Media3 handles metadata automatically via the MediaItem, 
-        // but it's good to have this for future specific updates.
+        // Handled via playSong usually, but kept for future use.
         call.resolve();
+    }
+
+    @Override
+    protected void handleOnDestroy() {
+        instance = null;
+        super.handleOnDestroy();
     }
 }

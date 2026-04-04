@@ -545,7 +545,18 @@ function App() {
   useEffect(() => {
     if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'android') return;
     
-    const listener = CapacitorApp.addListener('appStateChange', async ({ isActive }) => {
+    // Add real-time listener for native player updates
+    const nativeListener = BackgroundPlayback.addListener('onPlayerUpdate', (data) => {
+      console.log("Native Player Update:", data.type, data.message);
+      if (data.type === 'trackTransition') {
+        // Native player skipped to next song automatically
+        handleNextRef.current();
+      } else if (data.type === 'playerError') {
+        setPlayerError(`Native Playback Error: ${data.message}`);
+      }
+    });
+
+    const stateListener = CapacitorApp.addListener('appStateChange', async ({ isActive }) => {
       if (!currentSongRef.current) return;
       
       if (!isActive) {
@@ -561,7 +572,6 @@ function App() {
               url: currentStreamUrlRef.current,
               imageUrl: currentSongRef.current.thumbnail
             }).then(() => {
-              // Immediately seek native player to current time
               BackgroundPlayback.seekTo({ position: currentTime });
             }).catch(() => {});
           }
@@ -569,10 +579,11 @@ function App() {
       } else {
         // APP OPENED/FOREGROUNDED -> Hand off back to WebView
         const nativeState = await BackgroundPlayback.getPlaybackState().catch(() => null);
-        BackgroundPlayback.pause().catch(() => {});
         
         if (nativeState && nativeState.position > 0) {
           ytPlayer.seekTo(nativeState.position);
+          // Only pause native if we are successfully playing in webview
+          BackgroundPlayback.pause().catch(() => {});
         }
         if (isPlaying) {
           ytPlayer.play();
@@ -580,7 +591,10 @@ function App() {
       }
     });
 
-    return () => { listener.then(l => l.remove()); };
+    return () => { 
+      stateListener.then(l => l.remove());
+      nativeListener.then(l => l.remove());
+    };
   }, [isPlaying, ytPlayer]);
 
   // Volume sync
@@ -669,10 +683,14 @@ function App() {
     MusicControls.updateIsPlaying({ isPlaying: isPlaying });
 
     // Also update the native background service notification text
-    BackgroundPlayback.updateMetadata({
-      title:  currentSong.title,
-      artist: currentSong.artist || 'MusicTube',
-    }).catch(() => {});
+    if (!isAppActiveRef.current) {
+        BackgroundPlayback.playSong({
+          title:  currentSong.title,
+          artist: currentSong.artist || 'MusicTube',
+          url: currentStreamUrlRef.current,
+          imageUrl: currentSong.thumbnail
+        }).catch(() => {});
+    }
   }, [currentSong, isPlaying]);
 
   // Global static native listeners

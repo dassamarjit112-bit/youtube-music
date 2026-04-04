@@ -1,15 +1,13 @@
 /**
  * BackgroundPlayback Capacitor Plugin (Media3 Implementation)
- *
- * Bridges JavaScript to the native MusicPlayerService (ExoPlayer) on Android.
  */
-import { registerPlugin } from '@capacitor/core';
+import { registerPlugin, type PluginListenerHandle } from '@capacitor/core';
 
 export interface BackgroundPlaybackPlugin {
   /** Start/Update the Android Service (Legacy). */
   startService(options: { title: string; artist: string }): Promise<void>;
-  
-  /** Play a song via native ExoPlayer. */
+
+  /** Play/Update the native ExoPlayer. */
   playSong(options: { title: string; artist: string; url: string; imageUrl?: string }): Promise<void>;
   
   /** Pause native playback. */
@@ -18,29 +16,39 @@ export interface BackgroundPlaybackPlugin {
   /** Resume native playback. */
   resume(): Promise<void>;
 
-  /** Stop the service (call when playback is fully stopped). */
-  stopService(): Promise<void>;
-  
-  /** Update metadata. */
-  updateMetadata(options: { title: string; artist: string; imageUrl?: string }): Promise<void>;
+  /** Skip to next in native queue. */
+  next(): Promise<void>;
 
-  /** NEW: Get current playback position and duration. */
+  /** Skip to previous in native queue. */
+  previous(): Promise<void>;
+
+  /** Seek to a specific time (seconds). */
+  seekTo(options: { position: number }): Promise<void>;
+
+  /** Get current playback position and duration. */
   getPlaybackState(): Promise<{ isPlaying: boolean; position: number; duration: number }>;
 
-  /** NEW: Seek to a specific time (seconds). */
-  seekTo(options: { position: number }): Promise<void>;
+  /** Stop the service. */
+  stopService(): Promise<void>;
+
+  /** Listener for native player updates (track changes, state, errors). */
+  addListener(
+    eventName: 'onPlayerUpdate',
+    listenerFunc: (data: { type: string; message: string }) => void
+  ): Promise<PluginListenerHandle>;
 }
 
-// Web stub — all methods are no-ops when running outside Android
-const WebImpl: BackgroundPlaybackPlugin = {
+const WebImpl: any = {
   startService:     async () => {},
   playSong:         async () => {},
   pause:            async () => {},
   resume:           async () => {},
-  stopService:      async () => {},
-  updateMetadata:   async () => {},
-  getPlaybackState: async () => ({ isPlaying: false, position: 0, duration: 0 }),
+  next:             async () => {},
+  previous:         async () => {},
   seekTo:           async () => {},
+  getPlaybackState: async () => ({ isPlaying: false, position: 0, duration: 0 }),
+  stopService:      async () => {},
+  addListener:      async () => ({ remove: async () => {} }),
 };
 
 export const BackgroundPlayback = registerPlugin<BackgroundPlaybackPlugin>(
