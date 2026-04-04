@@ -660,35 +660,32 @@ function App() {
   useEffect(() => {
     if (!currentSong) return;
 
-    MusicControls.create({
-      track: currentSong.title,
-      artist: currentSong.artist || "MusicTube",
-      cover: currentSong.thumbnail,
-      isPlaying: isPlaying,
-      dismissable: true,
-      hasPrev: true,
-      hasNext: true,
-      hasClose: true,
-      ticker: 'Now playing ' + currentSong.title,
-      playIcon: 'media_play',
-      pauseIcon: 'media_pause',
-      prevIcon: 'media_prev',
-      nextIcon: 'media_next',
-      closeIcon: 'media_close',
-      notificationIcon: 'notification',
-      duration: isFinite(duration) ? duration : 0,
-      elapsed: isFinite(playedSeconds) ? playedSeconds : 0
-    });
-
-    MusicControls.updateIsPlaying({ isPlaying: isPlaying });
-
-    // Also update the native background service notification text
-    if (!isAppActiveRef.current) {
+    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
         BackgroundPlayback.playSong({
-          title:  currentSong.title,
-          artist: currentSong.artist || 'MusicTube',
-          url: currentStreamUrlRef.current,
+          title:    currentSong.title,
+          artist:   currentSong.artist || 'MusicTube',
+          url:      currentStreamUrlRef.current,
           imageUrl: currentSong.thumbnail
+        }).catch(() => {});
+    } else {
+        MusicControls.create({
+          track: currentSong.title,
+          artist: currentSong.artist || "MusicTube",
+          cover: currentSong.thumbnail,
+          isPlaying: isPlaying,
+          dismissable: true,
+          hasPrev: true,
+          hasNext: true,
+          hasClose: true,
+          ticker: 'Now playing ' + currentSong.title,
+          playIcon: 'media_play',
+          pauseIcon: 'media_pause',
+          prevIcon: 'media_prev',
+          nextIcon: 'media_next',
+          closeIcon: 'media_close',
+          notificationIcon: 'notification',
+          duration: isFinite(duration) ? duration : 0,
+          elapsed: isFinite(playedSeconds) ? playedSeconds : 0
         }).catch(() => {});
     }
   }, [currentSong, isPlaying]);

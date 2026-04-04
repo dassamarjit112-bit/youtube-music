@@ -122,8 +122,6 @@ public class MusicPlayerService extends MediaSessionService {
             String action = intent.getStringExtra("action");
             if ("play".equals(action)) {
                 handlePlaySong(intent);
-            } else if ("setQueue".equals(action)) {
-                handleSetQueue(intent);
             } else if ("pause".equals(action)) {
                 player.pause();
             } else if ("resume".equals(action)) {
@@ -137,17 +135,24 @@ public class MusicPlayerService extends MediaSessionService {
                 if (player.hasPreviousMediaItem()) player.seekToPrevious();
             }
         }
-        return super.onStartCommand(intent, flags, startId);
+        return START_STICKY; // CRITICAL: Tells Android to keep this service alive!
     }
 
     private void handlePlaySong(Intent intent) {
+        String url = intent.getStringExtra("url");
+        if (url == null || url.isEmpty()) return;
+
         MediaItem item = createMediaItemFromIntent(intent);
+        
+        // Ensure player is ready
         player.setMediaItem(item);
         player.prepare();
-        player.play();
+        player.setPlayWhenReady(true);
         
         if (wifiLock != null && !wifiLock.isHeld()) wifiLock.acquire();
         loadArtworkForMetadata(item, intent.getStringExtra("imageUrl"));
+        
+        Log.d(TAG, "Native playback started for: " + intent.getStringExtra("title"));
     }
 
     private void handleSetQueue(Intent intent) {
