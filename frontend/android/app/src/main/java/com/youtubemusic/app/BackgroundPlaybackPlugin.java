@@ -64,7 +64,7 @@ public class BackgroundPlaybackPlugin extends Plugin {
         String title = call.getString("title", "MusicTube");
         String artist = call.getString("artist", "Playing…");
         String imageUrl = call.getString("imageUrl");
-        long duration = (long) call.getDouble("duration", 0.0);
+        long duration = call.getDouble("duration", 0.0).longValue();
 
         if (isBound && musicService != null) {
             musicService.updateMetadata(title, artist, imageUrl, duration);
@@ -77,10 +77,9 @@ public class BackgroundPlaybackPlugin extends Plugin {
     @PluginMethod
     public void notifyProgress(PluginCall call) {
         boolean isPlaying = call.getBoolean("isPlaying", false);
-        double position = call.getDouble("position", 0.0);
-
+        Double position = call.getDouble("position", 0.0);
         if (isBound && musicService != null) {
-            musicService.updatePlaybackState(isPlaying, (long) position);
+            musicService.updatePlaybackState(isPlaying, position.longValue());
             call.resolve();
         } else {
             call.reject("Music service not bound");
