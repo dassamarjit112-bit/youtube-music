@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { App as CapacitorApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import { CapacitorMusicControls as MusicControls } from 'capacitor-music-controls';
 
 import {
@@ -11,6 +12,7 @@ import {
 import { api } from "./api";
 import type { Song, HomeSection, SearchResult, ArtistDetail, AlbumDetail } from "./api";
 import { useYouTubePlayer } from "./useYouTubePlayer";
+import { BackgroundPlayback } from "./plugins/BackgroundPlayback";
 import { supabase } from "./lib/supabase";
 import { Auth } from "./components/Auth";
 import { motion, AnimatePresence } from "framer-motion";
@@ -507,6 +509,24 @@ function App() {
       setQueue([song]);
       triggerAutoPlayExtension(song);
     }
+
+    // ─── Native Background Playback (Android Only) ───
+    try {
+      if (Capacitor.isNativePlatform()) {
+        const { url: streamUrl } = await api.stream(song.videoId);
+        if (streamUrl) {
+          await BackgroundPlayback.playSong({
+            title: song.title,
+            artist: song.artist,
+            url: streamUrl,
+            imageUrl: song.thumbnail,
+            duration: parseInt(song.duration) || 0
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("Native playback failed to start:", e);
+    }
   };
 
   // (Moved up for scoping)
@@ -558,10 +578,12 @@ function App() {
         if (playerState === 2 || playerState === 0 || playerState === 5 || playerState === -1) {
           ytPlayer.play();
         }
+        if (Capacitor.isNativePlatform()) BackgroundPlayback.resume();
       } else {
         if (playerState === 1 || playerState === 3) {
           ytPlayer.pause();
         }
+        if (Capacitor.isNativePlatform()) BackgroundPlayback.pause();
       }
     }
   }, [isPlaying, currentSong]);
