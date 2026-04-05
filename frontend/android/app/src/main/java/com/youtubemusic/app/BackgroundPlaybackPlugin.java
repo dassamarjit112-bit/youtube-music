@@ -65,6 +65,29 @@ public class BackgroundPlaybackPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void addNextTrack(PluginCall call) {
+        String title  = call.getString("title",  "MusicTube");
+        String artist = call.getString("artist", "Playing…");
+        String url    = call.getString("url");
+        String imageUrl = call.getString("imageUrl");
+
+        if (url == null || url.isEmpty()) {
+            call.reject("URL is required");
+            return;
+        }
+
+        Intent intent = new Intent(getContext(), MusicPlayerService.class);
+        intent.putExtra("action", "addNext");
+        intent.putExtra("title",  title);
+        intent.putExtra("artist", artist);
+        intent.putExtra("url",    url);
+        intent.putExtra("imageUrl", imageUrl);
+        
+        getContext().startService(intent);
+        call.resolve();
+    }
+
+    @PluginMethod
     public void pause(PluginCall call) {
         Intent intent = new Intent(getContext(), MusicPlayerService.class);
         intent.putExtra("action", "pause");

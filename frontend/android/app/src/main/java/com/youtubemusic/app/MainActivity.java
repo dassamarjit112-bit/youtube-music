@@ -23,6 +23,8 @@ public class MainActivity extends BridgeActivity {
         // Force hardware volume buttons to control media volume
         setVolumeControlStream(android.media.AudioManager.STREAM_MUSIC);
         
+        // Register Native Plugin
+        registerPlugin(BackgroundPlaybackPlugin.class);
         super.onCreate(savedInstanceState);
         
         // Apply WebView settings immediately after bridge creation

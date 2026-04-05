@@ -175,6 +175,10 @@ public class MusicPlayerService extends MediaSessionService {
             } else if ("seek".equals(action)) {
                 long pos = intent.getLongExtra("position", 0);
                 player.seekTo(pos);
+            } else if ("addNext".equals(action)) {
+                MediaItem item = createMediaItemFromIntent(intent);
+                player.addMediaItem(item);
+                loadArtworkForMetadata(item, intent.getStringExtra("imageUrl"));
             } else if ("next".equals(action)) {
                 if (player.hasNextMediaItem()) player.seekToNext();
             } else if ("previous".equals(action)) {
@@ -190,8 +194,9 @@ public class MusicPlayerService extends MediaSessionService {
 
         MediaItem item = createMediaItemFromIntent(intent);
         
-        // Ensure player is ready
-        player.setMediaItem(item);
+        // Start fresh queue
+        player.clearMediaItems();
+        player.addMediaItem(item);
         player.prepare();
         player.setPlayWhenReady(true);
         

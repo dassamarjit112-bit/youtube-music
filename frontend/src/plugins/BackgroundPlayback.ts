@@ -10,6 +10,9 @@ export interface BackgroundPlaybackPlugin {
   /** Play/Update the native ExoPlayer. */
   playSong(options: { title: string; artist: string; url: string; imageUrl?: string; duration?: number }): Promise<void>;
   
+  /** Append a song to the native queue (like ConcatenatingAudioSource) */
+  addNextTrack(options: { title: string; artist: string; url: string; imageUrl?: string; duration?: number }): Promise<void>;
+  
   /** Pause native playback. */
   pause(): Promise<void>;
   
@@ -46,6 +49,7 @@ export interface BackgroundPlaybackPlugin {
 const WebImpl: any = {
   startService:     async () => {},
   playSong:         async () => {},
+  addNextTrack:     async () => {},
   pause:            async () => {},
   resume:           async () => {},
   next:             async () => {},
